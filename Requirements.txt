@@ -1,0 +1,67 @@
+Purpose
+OpenCursor is a lightweight, console-based assistant to help developers build and modify software projects using LLMs (Large Language Models).
+The user navigates the file system interactively, selects files and directories, and communicates with an LLM through a visible WebView-based browser interface. 
+But the user is assumed to use a real IDE next to this tool to handle the solution. This is just an add-on tool.
+
+Key Requirements
+1. Console Application
+Written in C# (.NET 8 or later).
+
+Uses top-level statements for Program.cs.
+
+Organized with clear separation of concerns:
+
+DirectoryBrowser.cs for file system navigation and file selection.
+
+KeyboardNavigator.cs for keyboard interaction (e.g., arrows, tab, F1-F10).
+
+LLMClient.cs for preparing prompts and handling LLM communication, then applying code changes.
+
+Navigation should feel like old-school tools (e.g., Norton Commander).
+
+Keyboard controls:
+
+Arrow keys to move cursor.
+
+Tab to switch panels (if implemented later).
+
++ to mark/select a file or directory.
+
+- to unmark/deselect a file or directory.
+
+Enter to open folders.
+
+Function keys (F1-F10) for special commands.
+
+2. LLM Communication
+Selected files and directories are prepared into a single prompt.
+The LLM should also be able to call back to the console application using MCP commands
+
+Prompt includes:
+
+Instructions on allowed actions (create, update, delete files, list related files, e.g. search in directory for specific class).
+
+List of marked files and their contents or relevant content (should be exposed through MCP).
+
+@CREATE_FILE <relative_path>
+<file_content>
+@END
+
+@UPDATE_FILE <relative_path>
+<new_file_content>
+@END
+
+@DELETE_FILE <relative_path>
+@END
+
+The console app will POST the prompt to a local HTTP server at:
+
+http://localhost:12345/prompt
+
+Prompt is sent as JSON using HTTP POST.
+
+The response from the LLM is sent back as JSON using a lightweight HTTP listener (like a small web server) on localhost:23456 
+
+The WebView host will, once it captures the LLM response (via clipboard, automation, or DOM reading), POST the result to http://localhost:23456/mcp/.
+
+The console app will then, after confirmation, apply the changes back to the code files.
