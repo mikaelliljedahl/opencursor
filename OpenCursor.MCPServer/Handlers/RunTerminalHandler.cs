@@ -7,13 +7,7 @@ namespace OpenCursor.Client.Handlers
 {
     public class RunTerminalHandler : IMcpCommandHandler
     {
-        private readonly string workspaceRoot;
-
-        public RunTerminalHandler(string workspaceRoot)
-        {
-            workspaceRoot = workspaceRoot;
-        }
-
+        
         public string CommandName => "run_terminal_cmd";
 
         public bool CanHandle(IMcpCommand command) => command is RunTerminalCommand;

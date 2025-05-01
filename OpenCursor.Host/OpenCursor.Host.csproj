@@ -14,6 +14,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\OpenCursor.MCPServer\OpenCursor.MCPServer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="injectAndSubmit.js">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

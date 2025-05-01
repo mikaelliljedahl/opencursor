@@ -17,35 +17,35 @@ namespace OpenCursor.BrowserHost
         {
             base.OnStartup(e);
 
-            try
-            {
-                // Path to the OpenCursor.Client executable
-                string clientExecutablePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "OpenCursor.Client.exe");
+            //try
+            //{
+            //    // Path to the OpenCursor.Client executable
+            //    string serverExecutablePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "OpenCursor.MCPServer.exe");
 
-                if (!File.Exists(clientExecutablePath))
-                {
-                    MessageBox.Show($"Client executable not found at: {clientExecutablePath}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    Shutdown();
-                    return;
-                }
+            //    if (!File.Exists(serverExecutablePath))
+            //    {
+            //        MessageBox.Show($"Client executable not found at: {serverExecutablePath}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            //        Shutdown();
+            //        return;
+            //    }
 
-                // Start the OpenCursor.Client process
-                _clientProcess = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = clientExecutablePath,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    }
-                };
-                _clientProcess.Start();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to start OpenCursor.Client: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                Shutdown();
-            }
+            //    // Start the OpenCursor.Client process
+            //    _clientProcess = new Process
+            //    {
+            //        StartInfo = new ProcessStartInfo
+            //        {
+            //            FileName = serverExecutablePath,
+            //            UseShellExecute = false,
+            //            CreateNoWindow = true
+            //        }
+            //    };
+            //    _clientProcess.Start();
+            //}
+            //catch (Exception ex)
+            //{
+            //    MessageBox.Show($"Failed to start OpenCursor.Client: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            //    Shutdown();
+            //}
         }
 
         protected override void OnExit(ExitEventArgs e)

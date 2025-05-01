@@ -6,12 +6,7 @@ namespace OpenCursor.Client.Handlers
 {
     public class DeleteFileHandler : IMcpCommandHandler
     {
-        private readonly string workspaceRoot;
-
-        public DeleteFileHandler(string workspaceRoot)
-        {
-            workspaceRoot = workspaceRoot;
-        }
+        
 
         public string CommandName => "delete_file";
 
