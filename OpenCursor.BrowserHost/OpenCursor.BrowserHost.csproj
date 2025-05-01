@@ -10,6 +10,16 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
+    <PackageReference Include="ModelContextProtocol" Version="0.1.0-preview.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="injectAndSubmit.js">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="SystemPrompt\systemprompt.md">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -1,55 +1,42 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.RegularExpressions;
+using OpenCursor.Client.Commands;
 
 namespace OpenCursor.Client;
 
-public static class McpProcessor
+public class McpProcessor
 {
-    private static readonly Regex CommandRegex = new(@"^@(\w+)_FILE\s+(.+)", RegexOptions.Multiline);
-
-    public static void ApplyMcpCommands(string mcpText, string rootPath)
+    public void ApplyMcpCommands(IEnumerable<IMcpCommand> commands, string rootPath)
     {
-        var matches = CommandRegex.Matches(mcpText);
-
-        if (matches.Count == 0)
+        foreach (var command in commands)
         {
-            Console.WriteLine("No MCP commands found.");
-            return;
-        }
-
-        foreach (Match match in matches)
-        {
-            var action = match.Groups[1].Value.ToUpperInvariant();
-            var relativePath = match.Groups[2].Value.Trim();
-
-            var start = match.Index + match.Length;
-            var end = mcpText.IndexOf("@END", start, StringComparison.OrdinalIgnoreCase);
-
-            string content = "";
-            if (end > start)
+            switch (command)
             {
-                content = mcpText.Substring(start, end - start).Trim();
-            }
-
-            var fullPath = Path.Combine(rootPath, relativePath);
-
-            switch (action)
-            {
-                case "CREATE":
-                    CreateFile(fullPath, content);
+                case CreateFileCommand createFileCmd:
+                {
+                    var fullPath = Path.Combine(rootPath, createFileCmd.RelativePath);
+                    CreateFile(fullPath, createFileCmd.Content ?? string.Empty);
                     break;
-                case "UPDATE":
-                    UpdateFile(fullPath, content);
+                }
+                case UpdateFileCommand updateFileCmd:
+                {
+                    var fullPath = Path.Combine(rootPath, updateFileCmd.RelativePath);
+                    UpdateFile(fullPath, updateFileCmd.Content ?? string.Empty);
                     break;
-                case "DELETE":
+                }
+                case DeleteFileCommand deleteFileCmd:
+                {
+                    var fullPath = Path.Combine(rootPath, deleteFileCmd.RelativePath);
                     DeleteFile(fullPath);
                     break;
+                }
                 default:
-                    Console.WriteLine($"Unknown MCP action: {action}");
+                    Console.WriteLine($"Unknown or unsupported MCP command type: {command.GetType().Name}");
                     break;
             }
         }
     }
+
 
     private static void CreateFile(string path, string content)
     {

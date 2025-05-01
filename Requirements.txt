@@ -11,7 +11,7 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
 ## Architecture Overview
 **Components:**
 1. **Console Application** (Helper Interface)
-2. **WPF-Based Browser UI** (User interaction and Browser based LLM Interaction)
+2. **WPF-Based Browser UI** (User interaction and LLM Interaction)
 3. **Multi-Session LLM Handling**
 4. **Local HTTP Communication & MCP Protocol**
 
@@ -75,21 +75,68 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
 
 ### **3. Communication Flow**
 - **Local HTTP interactions**:
-  - Console app and the WPF App that hosts the interaction with the LLM inside a webview-browser will communicate using Websocket connections
+  - Console app and the WPF App that hosts the interaction with the LLM will communicate using Websocket connections
     ```
-  - WPF WebView captures responses and send results to instances of the console application that e.g. can apply code changes:
+  - WPF App captures responses and send results to instances of the console application that e.g. can apply code changes:
     ```
   - The console app **validates and applies** confirmed changes.
-  - The WPF app could also call an LLM using the Huggingface API.
+  - The WPF app could also call an LLM using the Google Gemini API.
 
 
 ---
 
 ### **4. WPF-Based UI**
-- Displays **LLM responses** and refinement options using a builtin webview browser using copilot.microsoft.com, chat.openai.com or chat.deepseek.com 
+- Displays **LLM responses** and refinement options using a builtin UI.
 - Supports **interactive validation** before applying modifications.
 - Tracks **history** of applied changes.
-- Spawn the con
+- Spawn the console app.
+
+---
+
+## Core Components
+
+1.  **Console Application (`OpenCursor.Client`):**
+    *   Displays the file/directory browser UI.
+    *   Handles keyboard navigation (up, down, enter, space for marking).
+    *   Manages the list of marked files/directories.
+    *   Receives parsed commands (file operations, command execution) from the WPF application via WebSocket.
+    *   Executes the received commands (create/update/delete files, run shell commands) using the McpProcessor.
+    *   Hosts a WebSocket server (`ws://localhost:12346/`) to listen for commands from the WPF app.
+
+2.  **WPF Application (`OpenCursor.BrowserHost`):**
+    *   Provides the main user interface for interacting with the Large Language Model (LLM).
+    *   Connects directly to the Google Gemini REST API.
+    *   Requires configuration for the Google API Key and Model Endpoint (must handle API key securely).
+    *   Displays the conversation history (user prompts and LLM responses).
+    *   Allows the user to type and send messages to the LLM via the API.
+    *   Loads a system prompt (`systemprompt.md`) to provide context/instructions to the LLM.
+    *   Sends the raw text response received from the Google Gemini API to the Console application via a WebSocket connection (`ws://localhost:12346/`).
+    *   Acts as a WebSocket client connecting to the Console app's server.
+
+---
+
+## Technology Stack
+
+*   .NET (latest stable version, e.g., .NET 8)
+*   C#
+*   WPF for the GUI application (`OpenCursor.BrowserHost`)
+*   Console Application (`OpenCursor.Client`)
+*   System.Net.Http for Google Gemini API calls.
+*   System.Net.WebSockets for communication between WPF and Console apps.
+*   System.Text.Json for API request/response serialization.
+*   (Optional) Configuration system for API keys/endpoints (e.g., appsettings.json, User Secrets).
+
+## Interaction Flow
+
+1.  User navigates filesystem in the Console App.
+2.  User interacts with the LLM via the WPF App.
+3.  WPF App sends user message + history + system prompt to Google Gemini API.
+4.  Google Gemini API responds with generated text.
+5.  WPF App displays the LLM response.
+6.  WPF App sends the raw LLM response string to the Console App via WebSocket.
+7.  Console App's WebSocket server receives the string.
+8.  Console App parses the string for XML-like commands (`<create_file>`, `<execute_command>`, etc.) using `LlmResponseParser`.
+9.  Console App executes the parsed commands using `McpProcessor` relative to its current directory.
 
 ---
 
@@ -99,4 +146,3 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
 - **Code Refactoring Assistance**: Suggests improvements.
 - **Automated Debugging & Error Detection**.
 - **Inline Comments for Code Rationalization**.
-
