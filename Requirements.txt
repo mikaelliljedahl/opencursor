@@ -1,67 +1,102 @@
-Purpose
-OpenCursor is a lightweight, console-based assistant to help developers build and modify software projects using LLMs (Large Language Models).
-The user navigates the file system interactively, selects files and directories, and communicates with an LLM through a visible WebView-based browser interface. 
-But the user is assumed to use a real IDE next to this tool to handle the solution. This is just an add-on tool.
+# OpenCursor - Intelligent Developer Assistant
 
-Key Requirements
-1. Console Application
-Written in C# (.NET 8 or later).
+## Purpose
+OpenCursor is a lightweight mix of console and WPF-based tools designed to assist developers in software development with the help of Large Language Models (LLMs). It facilitates:
+- **File Navigation**: Users explore project files interactively and mark those that needs attention
+- **Multi-Role LLM Interaction**: Different LLM sessions assist in requirements analysis, development, code verification, and integration.
+- **MCP-Based Code Execution**: LLM-generated suggestions are applied to the codebase using structured commands.
 
-Uses top-level statements for Program.cs.
+---
 
-Organized with clear separation of concerns:
+## Architecture Overview
+**Components:**
+1. **Console Application** (Helper Interface)
+2. **WPF-Based Browser UI** (User interaction and Browser based LLM Interaction)
+3. **Multi-Session LLM Handling**
+4. **Local HTTP Communication & MCP Protocol**
 
-DirectoryBrowser.cs for file system navigation and file selection.
+**LLM Roles:**
+- **Requirements Analyst**: Extracts and refines software needs.
+- **Developer Role**: Writes and suggests code modifications.
+- **Code Verifier**: Ensures correctness and best practices.
+- **Code Application & MCP Integration**: Applies confirmed changes.
 
-KeyboardNavigator.cs for keyboard interaction (e.g., arrows, tab, F1-F10).
+---
 
-LLMClient.cs for preparing prompts and handling LLM communication, then applying code changes.
+## Key Requirements
 
-Navigation should feel like old-school tools (e.g., Norton Commander).
+### **1. Console Application**
+- **Technology Stack**:  
+  - C# (.NET 8 or later)
+  - Uses top-level statements in `Program.cs`
+  - Organized for separation of concerns:
+    - `DirectoryBrowser.cs` (File System Navigation)
+    - `KeyboardNavigator.cs` (Keyboard Interaction)
+    - `LLMClient.cs` and `LLMServer.cs` (LLM Prompt Handling & Code Application)
 
-Keyboard controls:
+- **User Experience**:
+  - Inspired by classic tools like Norton Commander.
+  - **Keyboard controls**:
+    - Arrow keys → Move cursor.
+    - Tab → Switch panels.
+    - `+` → Select file/directory.
+    - `-` → Deselect file/directory.
+    - Enter → Open folders.
+    - Function keys (`F1`-`F10`) → Special commands.
 
-Arrow keys to move cursor.
+---
 
-Tab to switch panels (if implemented later).
+### **2. LLM Communication & MCP Protocol**
+- **Multi-Session LLM Handling**:
+  - Separate interactions for requirements analysis, development, and validation.
+  - Server and client implemented according to: https://github.com/modelcontextprotocol/csharp-sdk
 
-+ to mark/select a file or directory.
+- **Prompt Construction**:
+  - Collects selected files and directories.
+  - Instructions for allowed actions:
+    - File creation, updates, deletion.
+    - Searching for relevant code snippets/classes.
+  - Includes:
+    - Marked file paths.
+    - Relevant file contents.
+    - Contextual directory insights.
 
-- to unmark/deselect a file or directory.
+- **Model Context Protocol Based Code Execution**:
+  - Some of the commands that should be available for the LLM:
+    ```
+    CREATE_FILE <relative_path> <file_content>
 
-Enter to open folders.
+    UPDATE_FILE <relative_path> <new_file_content> END
 
-Function keys (F1-F10) for special commands.
+    DELETE_FILE <relative_path> 
+    ```
 
-2. LLM Communication
-Selected files and directories are prepared into a single prompt.
-The LLM should also be able to call back to the console application using MCP commands
+---
 
-Prompt includes:
+### **3. Communication Flow**
+- **Local HTTP interactions**:
+  - Console app and the WPF App that hosts the interaction with the LLM inside a webview-browser will communicate using Websocket connections
+    ```
+  - WPF WebView captures responses and send results to instances of the console application that e.g. can apply code changes:
+    ```
+  - The console app **validates and applies** confirmed changes.
+  - The WPF app could also call an LLM using the Huggingface API.
 
-Instructions on allowed actions (create, update, delete files, list related files, e.g. search in directory for specific class).
 
-List of marked files and their contents or relevant content (should be exposed through MCP).
+---
 
-@CREATE_FILE <relative_path>
-<file_content>
-@END
+### **4. WPF-Based UI**
+- Displays **LLM responses** and refinement options using a builtin webview browser using copilot.microsoft.com, chat.openai.com or chat.deepseek.com 
+- Supports **interactive validation** before applying modifications.
+- Tracks **history** of applied changes.
+- Spawn the con
 
-@UPDATE_FILE <relative_path>
-<new_file_content>
-@END
+---
 
-@DELETE_FILE <relative_path>
-@END
+## Future Enhancements
+- **Plugin System**: Allows extensibility.
+- **LLM Multi-Agent Collaboration**: Dynamic role-switching for different needs.
+- **Code Refactoring Assistance**: Suggests improvements.
+- **Automated Debugging & Error Detection**.
+- **Inline Comments for Code Rationalization**.
 
-The console app will POST the prompt to a local HTTP server at:
-
-http://localhost:12345/prompt
-
-Prompt is sent as JSON using HTTP POST.
-
-The response from the LLM is sent back as JSON using a lightweight HTTP listener (like a small web server) on localhost:23456 
-
-The WebView host will, once it captures the LLM response (via clipboard, automation, or DOM reading), POST the result to http://localhost:23456/mcp/.
-
-The console app will then, after confirmation, apply the changes back to the code files.
