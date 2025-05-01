@@ -35,7 +35,7 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
     - `LLMClient.cs` and `LLMServer.cs` (LLM Prompt Handling & Code Application)
 
 - **User Experience**:
-  - Inspired by classic tools like Norton Commander.
+  - Inspired by classic tools like Norton Commander to select active directory in the console app.
   - **Keyboard controls**:
     - Arrow keys → Move cursor.
     - Tab → Switch panels.
@@ -49,7 +49,7 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
 ### **2. LLM Communication & MCP Protocol**
 - **Multi-Session LLM Handling**:
   - Separate interactions for requirements analysis, development, and validation.
-  - Server and client implemented according to: https://github.com/modelcontextprotocol/csharp-sdk
+  - Server implemented according to: https://github.com/modelcontextprotocol/csharp-sdk
 
 - **Prompt Construction**:
   - Collects selected files and directories.
@@ -62,15 +62,8 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
     - Contextual directory insights.
 
 - **Model Context Protocol Based Code Execution**:
-  - Some of the commands that should be available for the LLM:
-    ```
-    CREATE_FILE <relative_path> <file_content>
-
-    UPDATE_FILE <relative_path> <new_file_content> END
-
-    DELETE_FILE <relative_path> 
-    ```
-
+  - Commands that should be available for the LLM will be called using the MCP protocol:
+    
 ---
 
 ### **3. Communication Flow**
