@@ -2,6 +2,7 @@ using OpenCursor.Client.Commands;
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace OpenCursor.Client.Handlers
 {
@@ -11,7 +12,7 @@ namespace OpenCursor.Client.Handlers
 
         public bool CanHandle(IMcpCommand command) => command is FileSearchCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             if (command is not FileSearchCommand searchCmd)
             {
@@ -20,8 +21,8 @@ namespace OpenCursor.Client.Handlers
 
             if (string.IsNullOrWhiteSpace(searchCmd.Query))
             {
-                Console.WriteLine("[File Search] Empty query provided.");
-                return;
+                return "[File Search] Empty query provided.";
+                
             }
 
             Console.WriteLine($"\n[File Search] Looking for files matching: '{searchCmd.Query}'");
@@ -50,21 +51,23 @@ namespace OpenCursor.Client.Handlers
 
                 if (!matches.Any())
                 {
-                    Console.WriteLine("No matches found.");
-                    return;
+                    return "No matches found.";
                 }
 
+                StringBuilder sb = new StringBuilder();
                 foreach (var match in matches)
                 {
-                    Console.WriteLine($"{match.Score,3}% - {match.Path}");
+                    sb.AppendLine($"{match.Score,3}% - {match.Path}");
                 }
+                sb.AppendLine("--- End of Results ---");
+                return sb.ToString();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error during file search: {ex.Message}");
-                throw;
+                return $"Error during file search: {ex.Message}";
+                
             }
-            Console.WriteLine("--- End of Results ---");
+            
         }
 
         // Simple Levenshtein distance-based fuzzy matching

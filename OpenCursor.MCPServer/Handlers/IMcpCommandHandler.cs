@@ -2,7 +2,8 @@ namespace OpenCursor.Client.Handlers
 {
     public interface IMcpCommandHandler
     {
-        Task HandleCommand(IMcpCommand command, string workspaceRoot);
+        string CommandName { get; }
+        Task<string> HandleCommand(IMcpCommand command, string workspaceRoot);
         bool CanHandle(IMcpCommand command);
 
         // Default implementation for GetFullPath

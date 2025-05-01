@@ -102,7 +102,9 @@ namespace OpenCursor.Client
                         if (commands.Any())
                         {
                             Console.WriteLine($"Parser generated {commands.Count()} command(s).");
-                            _processor.ApplyMcpCommands(commands, currentDirectory);
+                            var response = await _processor.ApplyMcpCommands(commands, currentDirectory);
+
+                            webSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(response)), WebSocketMessageType.Text, true, CancellationToken.None);
                         }
                         else 
                         {

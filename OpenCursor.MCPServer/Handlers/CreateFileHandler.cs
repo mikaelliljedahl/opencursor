@@ -6,6 +6,7 @@ namespace OpenCursor.Client.Handlers
 {
     public class CreateFileHandler : IMcpCommandHandler
     {
+        public string CommandName => "create_file";
         public bool CanHandle(IMcpCommand command) => command is CreateFileCommand;
 
         public async Task HandleCommand(IMcpCommand command, string workspaceRoot)

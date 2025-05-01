@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Reflection;
 using OpenCursor.Client.Handlers;
-using System.Text.RegularExpressions; // Required for Process
+using System.Text.RegularExpressions;
+using System.Text; // Required for Process
 
 namespace OpenCursor.Client
 {
@@ -40,12 +41,14 @@ namespace OpenCursor.Client
         }
 
         // Central method to apply a list of commands
-        public async Task ApplyMcpCommands(IEnumerable<IMcpCommand> commands, string currentDirectory)
+        public async Task<string> ApplyMcpCommands(IEnumerable<IMcpCommand> commands, string currentDirectory)
         {
+            
+
             if (commands == null || !commands.Any())
             {
-                Console.WriteLine("No commands to apply.");
-                return;
+                return "No commands to apply.";
+                
             }
 
             Console.WriteLine("\n--- Proposed Actions ---");
@@ -55,6 +58,8 @@ namespace OpenCursor.Client
                 DisplayProposedAction(command);
             }
             Console.WriteLine("----------------------");
+
+            StringBuilder responseBuilder = new StringBuilder();
 
             // Then, execute with confirmation where needed
             foreach (var command in commands)
@@ -72,7 +77,8 @@ namespace OpenCursor.Client
                     Console.WriteLine($"Executing: {GetCommandDescription(command)}...");
                     try
                     {
-                        await HandleCommand(command);
+                        var result = await HandleCommand(command);
+                        responseBuilder.Append(result);
                         Console.WriteLine("Execution successful.");
                     }
                     catch (Exception ex)
@@ -87,6 +93,8 @@ namespace OpenCursor.Client
                 }
                 Console.WriteLine(); // Add a blank line for readability
             }
+
+            return responseBuilder.ToString();
         }
 
         // Helper to display the proposed action
@@ -143,7 +151,7 @@ namespace OpenCursor.Client
         }
 
         // Main execution logic dispatcher
-        private async Task HandleCommand(IMcpCommand command)
+        private async Task<string> HandleCommand(IMcpCommand command)
         {
             // Find the appropriate handler for this command
             var handler = _handlers.FirstOrDefault(h => h.CanHandle(command));
@@ -153,7 +161,8 @@ namespace OpenCursor.Client
             }
 
             // Execute the command using the handler
-            await handler.HandleCommand(command, _workspaceRoot);
+            var result = await handler.HandleCommand(command, _workspaceRoot);
+            return result;
         }
 
         // --- Individual Command Execution Methods ---

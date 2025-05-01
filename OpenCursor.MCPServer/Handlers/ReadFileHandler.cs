@@ -1,6 +1,7 @@
 using OpenCursor.Client.Commands;
 using System;
 using System.IO;
+using System.Text;
 
 namespace OpenCursor.Client.Handlers
 {
@@ -11,7 +12,7 @@ namespace OpenCursor.Client.Handlers
 
         public bool CanHandle(IMcpCommand command) => command is ReadFileCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             if (command is not ReadFileCommand readCmd)
             {
@@ -21,33 +22,36 @@ namespace OpenCursor.Client.Handlers
             string fullPath = IMcpCommandHandler.GetFullPath(readCmd.RelativePath, workspaceRoot);
             if (!File.Exists(fullPath))
             {
-                Console.WriteLine($"[Read File] File not found: {readCmd.RelativePath}");
-                return;
+                return $"[Read File] File not found: {readCmd.RelativePath}";
             }
-
             try
             {
                 Console.WriteLine($"\n[Read File] Content of: {Path.GetFileName(readCmd.RelativePath)}");
                 if (readCmd.ShouldReadEntireFile || readCmd.StartLine == null || readCmd.EndLine == null)
                 {
-                    Console.WriteLine(File.ReadAllText(fullPath));
+                    return await File.ReadAllTextAsync(fullPath);
                 }
                 else
                 {
+                    StringBuilder sb = new StringBuilder();
                     var lines = File.ReadLines(fullPath)
                         .Skip(readCmd.StartLine.Value - 1)
                         .Take(readCmd.EndLine.Value - readCmd.StartLine.Value + 1);
                     foreach (var line in lines)
                     {
-                        Console.WriteLine(line);
+                        sb.AppendLine(line);
+                        
                     }
+                    sb.AppendLine("--- End of Content ---");
+                    return sb.ToString();
                 }
-                Console.WriteLine("--- End of Content ---");
+                
+
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error reading file: {ex.Message}");
-                throw;
+                return $"Error reading file: {ex.Message}";
+                
             }
         }
 

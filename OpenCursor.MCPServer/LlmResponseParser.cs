@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using OpenCursor.Client.Commands; // Ensure this using directive is present
+using OpenCursor.Client.Commands;
+using OpenCursor.Client.Handlers;
+using OpenCursor.MCPServer.Handlers; // Ensure this using directive is present
 
 namespace OpenCursor.Client
 {
@@ -104,132 +107,90 @@ namespace OpenCursor.Client
                 IMcpCommand? command = null;
                 try
                 {
-                    // Use the command classes directly for deserializing parameters
-                    // The [JsonPropertyName] attributes on the command classes handle mapping
-                    switch (request.Name.ToLowerInvariant()) // Use lower case for comparison
+
+                    // Find the appropriate command type based on the command name
+                    var handler = McpCommandHandlerRegistry.CreateHandler(request.Name);
+
+                    if (handler == null)
                     {
-                        case "create_file":
-                            command = request.Parameters.Deserialize<CreateFileCommand>(_jsonOptions);
-                            if (command is CreateFileCommand cfCmd) cfCmd.Content ??= string.Empty; // Ensure content isn't null
-                            break;
+                        continue;
+                        // throw new InvalidOperationException($"No handler found for command '{request.Name}'");
+                    }
 
-                        case "update_file":
-                            command = request.Parameters.Deserialize<UpdateFileCommand>(_jsonOptions);
-                            if (command is UpdateFileCommand ufCmd) ufCmd.Content ??= string.Empty; // Ensure content isn't null
-                            break;
 
-                        case "delete_file":
-                            command = request.Parameters.Deserialize<DeleteFileCommand>(_jsonOptions);
-                            // Correct validation to use TargetFile
-                            if (command is DeleteFileCommand delCmd && string.IsNullOrWhiteSpace(delCmd.TargetFile))
-                            {
-                                Console.WriteLine($"LLM Response Parser: Missing 'target_file' for delete_file command.");
-                                command = null; // Invalidate
-                            }
-                            break;
-
-                        case "read_file":
-                            command = request.Parameters.Deserialize<ReadFileCommand>(_jsonOptions);
-                            // Basic validation: Check if path is provided
-                            if (command is ReadFileCommand rfCmd && string.IsNullOrWhiteSpace(rfCmd.RelativePath))
-                            {
-                                Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for read_file command.");
-                                command = null; // Invalidate the command
-                            }
-                            break;
+                    if (handler != null)
+                    {
+                        // Deserialize using the found command type
+                        command = request.Parameters.Deserialize(handler, _jsonOptions) as IMcpCommand;
                         
-                        // --- Add New Command Cases --- 
-                        case "codebase_search":
-                            command = request.Parameters.Deserialize<CodebaseSearchCommand>(_jsonOptions);
-                            if (command is CodebaseSearchCommand csCmd && string.IsNullOrWhiteSpace(csCmd.Query))
-                            {
-                                Console.WriteLine($"LLM Response Parser: Missing 'query' for codebase_search command.");
-                                command = null;
-                            }
-                            break;
+                        // Handle null content fields for specific commands
+                        if (command is CreateFileCommand cfCmd) cfCmd.Content ??= string.Empty;
+                        if (command is UpdateFileCommand ufCmd) ufCmd.Content ??= string.Empty;
+                        if (command is EditFileCommand efCmd) efCmd.CodeEdit ??= string.Empty;
 
-                        case "run_terminal_cmd":
-                            command = request.Parameters.Deserialize<RunTerminalCommand>(_jsonOptions);
-                            if (command is RunTerminalCommand rtCmd && string.IsNullOrWhiteSpace(rtCmd.CommandLine))
-                            {
-                                Console.WriteLine($"LLM Response Parser: Missing 'command' for run_terminal_cmd command.");
-                                command = null;
-                            }
-                            break;
+                        // Validate required fields for specific commands
+                        if (command is ListDirCommand ldCmd && string.IsNullOrWhiteSpace(ldCmd.RelativePath))
+                        {
+                            Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for list_dir command.");
+                            command = null;
+                        }
+                        else if (command is DeleteFileCommand delCmd && string.IsNullOrWhiteSpace(delCmd.TargetFile))
+                        {
+                            Console.WriteLine($"LLM Response Parser: Missing 'target_file' for delete_file command.");
+                            command = null;
+                        }
+                        else if (command is ReadFileCommand rfCmd && string.IsNullOrWhiteSpace(rfCmd.RelativePath))
+                        {
+                            Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for read_file command.");
+                            command = null;
+                        }
+                        else if (command is CodebaseSearchCommand csCmd && string.IsNullOrWhiteSpace(csCmd.Query))
+                        {
+                            Console.WriteLine($"LLM Response Parser: Missing 'query' for codebase_search command.");
+                            command = null;
+                        }
+                        else if (command is RunTerminalCommand rtCmd && string.IsNullOrWhiteSpace(rtCmd.CommandLine))
+                        {
+                            Console.WriteLine($"LLM Response Parser: Missing 'command' for run_terminal_cmd command.");
+                            command = null;
+                        }
+                        else if (command is GrepSearchCommand gsCmd && string.IsNullOrWhiteSpace(gsCmd.Query))
+                        {
+                            Console.WriteLine($"LLM Response Parser: Missing 'query' for grep_search command.");
+                            command = null;
+                        }
+                        else if (command is FileSearchCommand fsCmd && string.IsNullOrWhiteSpace(fsCmd.Query))
+                        {
+                            Console.WriteLine($"LLM Response Parser: Missing 'query' for file_search command.");
+                            command = null;
+                        }
+                        else if (command is ReapplyCommand raCmd && string.IsNullOrWhiteSpace(raCmd.TargetFile))
+                        {
+                            Console.WriteLine($"LLM Response Parser: Missing 'target_file' for reapply command.");
+                            command = null;
+                        }
+                        else if (command is ParallelApplyCommand paCmd && 
+                            (string.IsNullOrWhiteSpace(paCmd.EditPlan) || paCmd.EditRegions == null || !paCmd.EditRegions.Any()))
+                        {
+                            Console.WriteLine($"LLM Response Parser: Missing required parameter(s) for parallel_apply command (edit_plan, edit_regions).";
+                            command = null;
+                        }
 
-                        case "list_dir":
-                            command = request.Parameters.Deserialize<ListDirCommand>(_jsonOptions);
-                            // Path is required for list_dir
-                            if (command is ListDirCommand ldCmd && string.IsNullOrWhiteSpace(ldCmd.RelativePath))
-                            {
-                                Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for list_dir command.");
-                                command = null;
-                            }
-                            break;
-
-                        case "grep_search":
-                            command = request.Parameters.Deserialize<GrepSearchCommand>(_jsonOptions);
-                            if (command is GrepSearchCommand gsCmd && string.IsNullOrWhiteSpace(gsCmd.Query))
-                            {
-                                Console.WriteLine($"LLM Response Parser: Missing 'query' for grep_search command.");
-                                command = null;
-                            }
-                            break;
-
-                        case "file_search":
-                            command = request.Parameters.Deserialize<FileSearchCommand>(_jsonOptions);
-                            if (command is FileSearchCommand fsCmd && string.IsNullOrWhiteSpace(fsCmd.Query))
-                            {
-                                Console.WriteLine($"LLM Response Parser: Missing 'query' for file_search command.");
-                                command = null;
-                            }
-                            break;
-
-                        case "edit_file":
-                            command = request.Parameters.Deserialize<EditFileCommand>(_jsonOptions);
-                            if (command is EditFileCommand efCmd && 
-                                (string.IsNullOrWhiteSpace(efCmd.TargetFile) || string.IsNullOrWhiteSpace(efCmd.Instructions) || string.IsNullOrWhiteSpace(efCmd.CodeEdit)))
-                            {
-                                Console.WriteLine($"LLM Response Parser: Missing required parameter(s) for edit_file command (target_file, instructions, code_edit).");
-                                command = null;
-                            }
-                            break;
-                        
-                        case "reapply":
-                            command = request.Parameters.Deserialize<ReapplyCommand>(_jsonOptions);
-                            if (command is ReapplyCommand raCmd && string.IsNullOrWhiteSpace(raCmd.TargetFile))
-                            {
-                                Console.WriteLine($"LLM Response Parser: Missing 'target_file' for reapply command.");
-                                command = null;
-                            }
-                            break;
-
-                        case "parallel_apply":
-                            command = request.Parameters.Deserialize<ParallelApplyCommand>(_jsonOptions);
-                            if (command is ParallelApplyCommand paCmd && 
-                                (string.IsNullOrWhiteSpace(paCmd.EditPlan) || paCmd.EditRegions == null || !paCmd.EditRegions.Any()))
-                            {
-                                Console.WriteLine($"LLM Response Parser: Missing required parameter(s) for parallel_apply command (edit_plan, edit_regions).");
-                                command = null;
-                            }
-                            // Could add deeper validation for EditRegions if needed
-                            break;
-                        // ---------------------------
-
-                        default:
-                            Console.WriteLine($"LLM Response Parser: Unsupported command name '{request.Name}'");
-                            break;
+                        if (command != null)
+                        {
+                            yield return command;
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"LLM Response Parser: No command type found for: {request.Name}");
                     }
                 }
-                catch (JsonException paramEx)
+                catch (Exception ex)
                 {
-                    // Log detailed error if parameter deserialization fails for a specific command
-                    Console.WriteLine($"LLM Response Parser: Failed to deserialize parameters for command '{request.Name}': {paramEx.Message}. Parameters JSON: {request.Parameters.GetRawText()}");
+                    Console.WriteLine($"LLM Response Parser: Error parsing command {request.Name}: {ex.Message}");
                 }
-                catch (Exception ex) // Catch broader exceptions during processing
-                {
-                    Console.WriteLine($"LLM Response Parser: Error processing command '{request.Name}': {ex.Message}");
-                }
+            }
 
                 if (command != null)
                 {

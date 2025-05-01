@@ -6,6 +6,8 @@ namespace OpenCursor.Client.Handlers
 {
     public class UpdateFileHandler : IMcpCommandHandler
     {
+        public string CommandName => "update_file";
+
         public bool CanHandle(IMcpCommand command) => command is UpdateFileCommand;
 
         public async Task HandleCommand(IMcpCommand command, string workspaceRoot)

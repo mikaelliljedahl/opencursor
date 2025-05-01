@@ -10,7 +10,7 @@ namespace OpenCursor.Client.Handlers
 
         public bool CanHandle(IMcpCommand command) => command is EditFileCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             if (command is not EditFileCommand editCmd)
             {
@@ -19,14 +19,14 @@ namespace OpenCursor.Client.Handlers
 
             if (string.IsNullOrWhiteSpace(editCmd.TargetFile))
             {
-                Console.WriteLine("[File Edit] Missing target file path.");
-                return;
+                return "[File Edit] Missing target file path.";
+                
             }
 
             if (string.IsNullOrWhiteSpace(editCmd.CodeEdit))
             {
-                Console.WriteLine("[File Edit] Empty code edit provided.");
-                return;
+                return "[File Edit] Empty code edit provided.";
+                
             }
             // Create backup of the original file
             string fullPath = IMcpCommandHandler.GetFullPath(editCmd.TargetFile, workspaceRoot );
