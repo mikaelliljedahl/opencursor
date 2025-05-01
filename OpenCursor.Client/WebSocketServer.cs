@@ -97,11 +97,11 @@ namespace OpenCursor.Client
                         string message = Encoding.UTF8.GetString(buffer, 0, result.Count);
                         Console.WriteLine($"Console Received via WebSocket: {message.Substring(0, Math.Min(message.Length, 200))}...");
 
-                        List<IMcpCommand> commands = _parser.ParseCommands(message);
+                        IEnumerable<IMcpCommand> commands = _parser.ParseCommands(message);
 
                         if (commands.Any())
                         {
-                            Console.WriteLine($"Parser generated {commands.Count} command(s).");
+                            Console.WriteLine($"Parser generated {commands.Count()} command(s).");
                             _processor.ApplyMcpCommands(commands, currentDirectory);
                         }
                         else 

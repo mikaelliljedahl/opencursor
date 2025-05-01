@@ -14,7 +14,7 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
 2. **WPF-Based Browser UI** (User interaction and LLM Interaction)
 3. **Multi-Session LLM Handling**
 4. **Local HTTP Communication & MCP Protocol**
-
+ 
 **LLM Roles:**
 - **Requirements Analyst**: Extracts and refines software needs.
 - **Developer Role**: Writes and suggests code modifications.
@@ -137,6 +137,29 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
 7.  Console App's WebSocket server receives the string.
 8.  Console App parses the string for XML-like commands (`<create_file>`, `<execute_command>`, etc.) using `LlmResponseParser`.
 9.  Console App executes the parsed commands using `McpProcessor` relative to its current directory.
+
+---
+
+## Supported Client Commands (JSON Function Calls from LLM):
+
+The Console Client (`OpenCursor.Client`) must parse and execute the following commands received as JSON objects within the LLM's response via the WebSocket connection:
+
+1.  **`codebase_search`**: Performs semantic search.
+    *   `parameters`: `query` (string), `target_directories` (string[]?)
+2.  **`read_file`**: Reads content from a file.
+    *   `parameters`: `relative_workspace_path` (string), `should_read_entire_file` (bool), `start_line_one_indexed` (int?), `end_line_one_indexed_inclusive` (int?)
+3.  **`run_terminal_cmd`**: Executes a shell command.
+    *   `parameters`: `command` (string), `is_background` (bool), `require_user_approval` (bool)
+4.  **`list_dir`**: Lists contents of a directory.
+    *   `parameters`: `relative_workspace_path` (string)
+5.  **`grep_search`**: Performs text/regex search (like ripgrep).
+    *   `parameters`: `query` (string), `case_sensitive` (bool?), `include_pattern` (string?), `exclude_pattern` (string?)
+6.  **`file_search`**: Fuzzy finds files by path.
+    *   `parameters`: `query` (string)
+7.  **`delete_file`**: Deletes a specified file.
+    *   `parameters`: `target_file` (string) (Mapped to `RelativePath` in C# class)
+
+(Note: Commands like `edit_file`, `reapply`, `parallel_apply` are instructions for the LLM agent itself and are not processed by the client.)
 
 ---
 

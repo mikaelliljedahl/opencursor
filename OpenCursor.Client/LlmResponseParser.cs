@@ -1,116 +1,242 @@
 using System;
 using System.Collections.Generic;
-using System.Xml.Linq;
-using System.IO;
-using OpenCursor.Client.Commands;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using OpenCursor.Client.Commands; // Ensure this using directive is present
 
 namespace OpenCursor.Client
 {
     public class LlmResponseParser
     {
-        // Parses the raw LLM response string containing XML-like command tags
-        // and returns a list of McpCommand objects.
-        public List<IMcpCommand> ParseCommands(string rawResponse)
-        {   
-            var commands = new List<IMcpCommand>();
-            if (string.IsNullOrWhiteSpace(rawResponse))
+        // Helper class to represent the incoming JSON command structure
+        private class McpCommandRequest
+        {
+            [JsonPropertyName("name")]
+            public string Name { get; set; } = string.Empty;
+
+            [JsonPropertyName("parameters")]
+            public JsonElement Parameters { get; set; } // Use JsonElement for flexible parameter parsing
+        }
+
+        // Options for deserialization (can be customized further if needed)
+        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true // Handles minor case variations if JsonPropertyName isn't used everywhere
+            // Add other options like custom converters if necessary
+        };
+
+        public IEnumerable<IMcpCommand> ParseCommands(string llmResponse)
+        {
+            if (string.IsNullOrWhiteSpace(llmResponse))
             {
-                return commands; // Return empty list if response is empty
+                yield break; // No commands to parse
             }
 
-            // Basic check if it looks like XML might be present
-            if (!rawResponse.Trim().Contains('<') || !rawResponse.Trim().Contains('>'))
+            // Basic cleanup: Trim whitespace and potential markdown code fences
+            string jsonContent = llmResponse.Trim();
+            if (jsonContent.StartsWith("```json"))
             {
-                 Console.WriteLine("Parser: Received response does not appear to contain XML tags. Skipping parse.");
-                 // Potentially handle plain text differently here if needed
-                 return commands;
+                jsonContent = jsonContent.Substring(7);
+                jsonContent = jsonContent.TrimEnd('`');
             }
+            else if (jsonContent.StartsWith("```")) // Handle generic code fence
+            {
+                jsonContent = jsonContent.Substring(3);
+                jsonContent = jsonContent.TrimEnd('`');
+            }
+            jsonContent = jsonContent.Trim(); // Trim again after removing fences
+
+
+            // Check if the content is likely JSON (starts with { or [)
+            if (!jsonContent.StartsWith("{") && !jsonContent.StartsWith("["))
+            {
+                // If it doesn't look like JSON, maybe it's just plain text - treat as no command
+                Console.WriteLine($"LLM Response Parser: Response does not appear to be JSON: {jsonContent.Substring(0, Math.Min(jsonContent.Length, 100))}...");
+                yield break;
+            }
+
+
+            List<McpCommandRequest> commandRequests = new List<McpCommandRequest>();
 
             try
             {
-                // Attempt to wrap the content to handle potentially non-rooted fragments 
-                // and ensure valid XML structure for parsing.
-                // We expect commands like <create_file path="...">content</create_file>
-                // or <execute_command>command line</execute_command>
-                string wrappedXml = $"<root>{rawResponse}</root>"; 
-                XDocument doc = XDocument.Parse(wrappedXml, LoadOptions.None);
-
-                foreach (XElement element in doc.Root.Elements())
+                // Attempt to deserialize as a single command object first
+                if (jsonContent.StartsWith("{"))
                 {
-                    string commandName = element.Name.LocalName;
-                    string content = element.Value; // Content inside the tag
-                    string path = element.Attribute("path")?.Value; // Path attribute for file ops
+                    var singleCommand = JsonSerializer.Deserialize<McpCommandRequest>(jsonContent, _jsonOptions);
+                    if (singleCommand != null && !string.IsNullOrEmpty(singleCommand.Name))
+                    {
+                        commandRequests.Add(singleCommand);
+                    }
+                    else
+                    {
+                        // Log if it looks like an object but fails to deserialize meaningfully
+                        Console.WriteLine($"LLM Response Parser: Failed to deserialize as a single command object: {jsonContent.Substring(0, Math.Min(jsonContent.Length, 100))}...");
+                    }
+                }
+                // If it starts with '[', attempt to deserialize as an array
+                else if (jsonContent.StartsWith("["))
+                {
+                    var multipleCommands = JsonSerializer.Deserialize<List<McpCommandRequest>>(jsonContent, _jsonOptions);
+                    if (multipleCommands != null)
+                    {
+                        commandRequests.AddRange(multipleCommands.Where(cmd => cmd != null && !string.IsNullOrEmpty(cmd.Name)));
+                    }
+                    else
+                    {
+                        // Log if it looks like an array but fails to deserialize meaningfully
+                        Console.WriteLine($"LLM Response Parser: Failed to deserialize as a command array: {jsonContent.Substring(0, Math.Min(jsonContent.Length, 100))}...");
+                    }
+                }
+                // If neither { nor [, we already exited above
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine($"LLM Response Parser: JSON Deserialization failed: {ex.Message}. Content: {jsonContent.Substring(0, Math.Min(jsonContent.Length, 100))}...");
+                yield break; // Exit if JSON is fundamentally invalid
+            }
 
-                    Console.WriteLine($"Parser: Found tag '{commandName}' Path='{path}' Content='{content.Substring(0, Math.Min(content.Length, 50))}...'");
 
-                    switch (commandName.ToLowerInvariant())
+            // --- Convert McpCommandRequest objects to specific IMcpCommand instances ---
+            foreach (var request in commandRequests)
+            {
+                IMcpCommand? command = null;
+                try
+                {
+                    // Use the command classes directly for deserializing parameters
+                    // The [JsonPropertyName] attributes on the command classes handle mapping
+                    switch (request.Name.ToLowerInvariant()) // Use lower case for comparison
                     {
                         case "create_file":
-                            if (!string.IsNullOrEmpty(path))
-                            {
-                                commands.Add(new CreateFileCommand { RelativePath = path, Content = content });
-                            }
-                            else
-                            {
-                                Console.WriteLine($"Parser Warning: <create_file> tag missing 'path' attribute. Skipping.");
-                            }
+                            command = request.Parameters.Deserialize<CreateFileCommand>(_jsonOptions);
+                            if (command is CreateFileCommand cfCmd) cfCmd.Content ??= string.Empty; // Ensure content isn't null
                             break;
 
-                        case "update_file": // Assuming update_file also uses path + content
-                             if (!string.IsNullOrEmpty(path))
-                            {
-                                // NOTE: McpProcessor might need adjustment if Update is different from Create
-                                // For now, treating similarly for parsing structure
-                                commands.Add(new UpdateFileCommand { RelativePath = path, Content = content }); 
-                            }
-                            else
-                            {
-                                Console.WriteLine($"Parser Warning: <update_file> tag missing 'path' attribute. Skipping.");
-                            }
+                        case "update_file":
+                            command = request.Parameters.Deserialize<UpdateFileCommand>(_jsonOptions);
+                            if (command is UpdateFileCommand ufCmd) ufCmd.Content ??= string.Empty; // Ensure content isn't null
                             break;
-                         
+
                         case "delete_file":
-                             if (!string.IsNullOrEmpty(path))
+                            command = request.Parameters.Deserialize<DeleteFileCommand>(_jsonOptions);
+                            // Correct validation to use TargetFile
+                            if (command is DeleteFileCommand delCmd && string.IsNullOrWhiteSpace(delCmd.TargetFile))
                             {
-                                commands.Add(new DeleteFileCommand { RelativePath = path });
-                            }
-                            else
-                            {
-                                Console.WriteLine($"Parser Warning: <delete_file> tag missing 'path' attribute. Skipping.");
+                                Console.WriteLine($"LLM Response Parser: Missing 'target_file' for delete_file command.");
+                                command = null; // Invalidate
                             }
                             break;
 
-                        case "execute_command":
-                            if (!string.IsNullOrWhiteSpace(content))
+                        case "read_file":
+                            command = request.Parameters.Deserialize<ReadFileCommand>(_jsonOptions);
+                            // Basic validation: Check if path is provided
+                            if (command is ReadFileCommand rfCmd && string.IsNullOrWhiteSpace(rfCmd.RelativePath))
                             {
-                                commands.Add(new ExecuteCommand { CommandLine = content });
-                            }
-                            else
-                            {
-                                Console.WriteLine($"Parser Warning: <execute_command> tag has empty content. Skipping.");
+                                Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for read_file command.");
+                                command = null; // Invalidate the command
                             }
                             break;
                         
-                        // Add cases for other commands as defined in systemprompt.md
+                        // --- Add New Command Cases --- 
+                        case "codebase_search":
+                            command = request.Parameters.Deserialize<CodebaseSearchCommand>(_jsonOptions);
+                            if (command is CodebaseSearchCommand csCmd && string.IsNullOrWhiteSpace(csCmd.Query))
+                            {
+                                Console.WriteLine($"LLM Response Parser: Missing 'query' for codebase_search command.");
+                                command = null;
+                            }
+                            break;
+
+                        case "run_terminal_cmd":
+                            command = request.Parameters.Deserialize<RunTerminalCommand>(_jsonOptions);
+                            if (command is RunTerminalCommand rtCmd && string.IsNullOrWhiteSpace(rtCmd.CommandLine))
+                            {
+                                Console.WriteLine($"LLM Response Parser: Missing 'command' for run_terminal_cmd command.");
+                                command = null;
+                            }
+                            break;
+
+                        case "list_dir":
+                            command = request.Parameters.Deserialize<ListDirCommand>(_jsonOptions);
+                            // Path is required for list_dir
+                            if (command is ListDirCommand ldCmd && string.IsNullOrWhiteSpace(ldCmd.RelativePath))
+                            {
+                                Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for list_dir command.");
+                                command = null;
+                            }
+                            break;
+
+                        case "grep_search":
+                            command = request.Parameters.Deserialize<GrepSearchCommand>(_jsonOptions);
+                            if (command is GrepSearchCommand gsCmd && string.IsNullOrWhiteSpace(gsCmd.Query))
+                            {
+                                Console.WriteLine($"LLM Response Parser: Missing 'query' for grep_search command.");
+                                command = null;
+                            }
+                            break;
+
+                        case "file_search":
+                            command = request.Parameters.Deserialize<FileSearchCommand>(_jsonOptions);
+                            if (command is FileSearchCommand fsCmd && string.IsNullOrWhiteSpace(fsCmd.Query))
+                            {
+                                Console.WriteLine($"LLM Response Parser: Missing 'query' for file_search command.");
+                                command = null;
+                            }
+                            break;
+
+                        case "edit_file":
+                            command = request.Parameters.Deserialize<EditFileCommand>(_jsonOptions);
+                            if (command is EditFileCommand efCmd && 
+                                (string.IsNullOrWhiteSpace(efCmd.TargetFile) || string.IsNullOrWhiteSpace(efCmd.Instructions) || string.IsNullOrWhiteSpace(efCmd.CodeEdit)))
+                            {
+                                Console.WriteLine($"LLM Response Parser: Missing required parameter(s) for edit_file command (target_file, instructions, code_edit).");
+                                command = null;
+                            }
+                            break;
+                        
+                        case "reapply":
+                            command = request.Parameters.Deserialize<ReapplyCommand>(_jsonOptions);
+                            if (command is ReapplyCommand raCmd && string.IsNullOrWhiteSpace(raCmd.TargetFile))
+                            {
+                                Console.WriteLine($"LLM Response Parser: Missing 'target_file' for reapply command.");
+                                command = null;
+                            }
+                            break;
+
+                        case "parallel_apply":
+                            command = request.Parameters.Deserialize<ParallelApplyCommand>(_jsonOptions);
+                            if (command is ParallelApplyCommand paCmd && 
+                                (string.IsNullOrWhiteSpace(paCmd.EditPlan) || paCmd.EditRegions == null || !paCmd.EditRegions.Any()))
+                            {
+                                Console.WriteLine($"LLM Response Parser: Missing required parameter(s) for parallel_apply command (edit_plan, edit_regions).");
+                                command = null;
+                            }
+                            // Could add deeper validation for EditRegions if needed
+                            break;
+                        // ---------------------------
 
                         default:
-                            Console.WriteLine($"Parser Warning: Unknown command tag '{commandName}'. Skipping.");
+                            Console.WriteLine($"LLM Response Parser: Unsupported command name '{request.Name}'");
                             break;
                     }
                 }
-            }
-            catch (System.Xml.XmlException xmlEx)
-            {
-                // Handle cases where the response is not valid XML or contains unexpected structures
-                Console.WriteLine($"Parser Error: Failed to parse LLM response as XML. Content: '{rawResponse.Substring(0, Math.Min(rawResponse.Length, 200))}...' Error: {xmlEx.Message}");
-                // Optionally, return the raw string as a different type or log it
-            }
-             catch (Exception ex)
-            {
-                Console.WriteLine($"Parser Error: Unexpected error during parsing. Error: {ex.Message}");
-            }
+                catch (JsonException paramEx)
+                {
+                    // Log detailed error if parameter deserialization fails for a specific command
+                    Console.WriteLine($"LLM Response Parser: Failed to deserialize parameters for command '{request.Name}': {paramEx.Message}. Parameters JSON: {request.Parameters.GetRawText()}");
+                }
+                catch (Exception ex) // Catch broader exceptions during processing
+                {
+                    Console.WriteLine($"LLM Response Parser: Error processing command '{request.Name}': {ex.Message}");
+                }
 
-            return commands;
+                if (command != null)
+                {
+                    yield return command; // Return the successfully parsed command
+                }
+            }
         }
+        // Note: Removed old XML parsing methods like ExtractCommand, ExtractParameter, UnescapeXml
     }
 }
