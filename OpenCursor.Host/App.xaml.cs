@@ -15,6 +15,7 @@ namespace OpenCursor.BrowserHost
 
         public App()
         {
+           
             _host = CreateHostBuilder().Build();
         }
 
@@ -62,6 +63,19 @@ namespace OpenCursor.BrowserHost
         {
             // Register WPF windows
             services.AddSingleton<MainWindow>();
+
+            var assembly = typeof(MCPServer.MCPServer).Assembly;
+            var serializerOptions = new System.Text.Json.JsonSerializerOptions()
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            var inputStream = new System.IO.MemoryStream();
+            var outputStream = new System.IO.MemoryStream();
+
+            services.AddMcpServer()
+                .WithStreamServerTransport(inputStream, outputStream)
+                .WithToolsFromAssembly(assembly, serializerOptions);
 
             // Register your view models
             // services.AddSingleton<MainViewModel>();
