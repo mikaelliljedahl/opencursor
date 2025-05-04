@@ -20,12 +20,17 @@ namespace OpenCursor.BrowserHost
 
         public static IServiceProvider Services => ((App)Current)._host.Services;
 
-
-        protected override void OnStartup(StartupEventArgs e)
+        protected override async void OnStartup(StartupEventArgs e)
         {
-            base.OnStartup(e);
+            await _host.StartAsync();
 
+            // Get the main window from the service provider
+            var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+            mainWindow.Show();
+
+            base.OnStartup(e);
         }
+
 
         protected override async void OnExit(ExitEventArgs e)
         {
