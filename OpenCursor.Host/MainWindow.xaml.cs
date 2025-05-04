@@ -18,10 +18,10 @@ namespace OpenCursor.BrowserHost
     {
         // --- Configuration --- 
         // TODO: Replace with your actual Google API Key (Load securely! e.g., User Secrets, Env Vars)
-        private string _googleApiKey = ""; 
+        private string _googleApiKey = ""; // TODO - read from settings file + UI to set the settings
         private string _geminiModelName = "gemini-2.0-flash"; // Or other suitable model
         private const string GeminiApiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models/";
-        private const string ConsoleAppWebSocketUrl = "ws://localhost:12346/"; // Console App's server
+        private const string MCPServerWebSocketUrl = "ws://localhost:12346/"; // Console App's server, will be switched to use a builtin service, this was designed using 2 separate exe-files
         private string SystemPromptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SystemPrompt", "systemprompt.md"); // Assuming it's copied to output
 
         // --- State --- 
@@ -72,7 +72,7 @@ namespace OpenCursor.BrowserHost
             try
             {
                 AddChatMessage("System: Connecting to Console App...");
-                await _clientWebSocket.ConnectAsync(new Uri(ConsoleAppWebSocketUrl), CancellationToken.None);
+                await _clientWebSocket.ConnectAsync(new Uri(MCPServerWebSocketUrl), CancellationToken.None);
                 AddChatMessage("System: Connected to Console App.");
                 // Start listening for messages from console (if needed for bi-directional)
                 // Task.Run(async () => await ListenForConsoleMessages()); 

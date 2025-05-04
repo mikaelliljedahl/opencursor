@@ -10,7 +10,7 @@ namespace OpenCursor.Client.Handlers
 
         public bool CanHandle(IMcpCommand command) => command is UpdateFileCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             var updateCommand = (UpdateFileCommand)command;
             string fullPath = Path.Combine(workspaceRoot, updateCommand.RelativePath);
@@ -23,7 +23,7 @@ namespace OpenCursor.Client.Handlers
                 throw new FileNotFoundException("File not found for update.", fullPath);
 
             await File.WriteAllTextAsync(fullPath, updateCommand.Content ?? string.Empty);
-            Console.WriteLine($"File updated: {fullPath}");
+            return $"File updated: {updateCommand.RelativePath}";
         }
     }
 }

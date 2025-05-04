@@ -1,6 +1,7 @@
 using OpenCursor.Client.Commands;
 using System;
 using System.IO;
+using System.Text;
 
 namespace OpenCursor.Client.Handlers
 {
@@ -10,7 +11,7 @@ namespace OpenCursor.Client.Handlers
 
         public bool CanHandle(IMcpCommand command) => command is ReapplyCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             if (command is not ReapplyCommand reapplyCmd)
             {
@@ -19,9 +20,11 @@ namespace OpenCursor.Client.Handlers
 
             if (string.IsNullOrWhiteSpace(reapplyCmd.TargetFile))
             {
-                Console.WriteLine("[Reapply] Missing target file path.");
-                return;
+                return "[Reapply] Missing target file path.";
+                
             }
+
+            StringBuilder sb = new StringBuilder();
 
             try
             {
@@ -30,8 +33,8 @@ namespace OpenCursor.Client.Handlers
                 string backupPath = fullPath + ".bak";
                 if (!File.Exists(backupPath))
                 {
-                    Console.WriteLine($"[Reapply] No backup file found for: {Path.GetRelativePath(workspaceRoot, fullPath)}");
-                    return;
+                    return $"[Reapply] No backup file found for: {Path.GetRelativePath(workspaceRoot, fullPath)}";
+                    
                 }
 
                 // Read both files
@@ -42,25 +45,27 @@ namespace OpenCursor.Client.Handlers
                 if (currentContent != backupContent)
                 {
                     File.Copy(backupPath, fullPath, true);
-                    Console.WriteLine($"\n[Reapply] Restored: {Path.GetRelativePath(workspaceRoot, fullPath)}");
-                    Console.WriteLine($"Backup file: {Path.GetRelativePath(workspaceRoot, backupPath)}");
+                    sb.AppendLine($"\n[Reapply] Restored: {Path.GetRelativePath(workspaceRoot, fullPath)}");
+                    sb.AppendLine($"Backup file: {Path.GetRelativePath(workspaceRoot, backupPath)}");
 
                     // Show a preview of the changes
-                    Console.WriteLine("\n--- Changes ---");
-                    Console.WriteLine($"Current lines: {currentContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None).Length}");
-                    Console.WriteLine($"Backup lines: {backupContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None).Length}");
-                    Console.WriteLine("--- End of Changes ---");
+                    sb.AppendLine("\n--- Changes ---");
+                    sb.AppendLine($"Current lines: {currentContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None).Length}");
+                    sb.AppendLine($"Backup lines: {backupContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None).Length}");
+                    sb.AppendLine("--- End of Changes ---");
                 }
                 else
                 {
-                    Console.WriteLine($"[Reapply] No changes to restore for: {Path.GetRelativePath(workspaceRoot, fullPath)}");
+                    sb.AppendLine($"[Reapply] No changes to restore for: {Path.GetRelativePath(workspaceRoot, fullPath)}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error during reapply: {ex.Message}");
+                sb.AppendLine($"Error during reapply: {ex.Message}");
                 throw;
             }
+
+            return sb.ToString();
         }
 
     }

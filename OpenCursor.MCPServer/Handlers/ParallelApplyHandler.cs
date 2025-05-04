@@ -2,6 +2,7 @@ using OpenCursor.Client.Commands;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace OpenCursor.Client.Handlers
@@ -12,7 +13,7 @@ namespace OpenCursor.Client.Handlers
 
         public bool CanHandle(IMcpCommand command) => command is ParallelApplyCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             if (command is not ParallelApplyCommand parallelCmd)
             {
@@ -21,14 +22,16 @@ namespace OpenCursor.Client.Handlers
 
             if (string.IsNullOrWhiteSpace(parallelCmd.EditPlan) || parallelCmd.EditRegions == null || !parallelCmd.EditRegions.Any())
             {
-                Console.WriteLine("[Parallel Apply] Invalid edit plan or empty regions.");
-                return;
+                return "[Parallel Apply] Invalid edit plan or empty regions.";
+                
             }
 
+            StringBuilder sb = new StringBuilder();
             try
             {
-                Console.WriteLine($"\n[Parallel Apply] Applying edit plan: '{Shorten(parallelCmd.EditPlan, 100)}'");
-                Console.WriteLine($"Total regions to edit: {parallelCmd.EditRegions.Count}");
+                
+                sb.AppendLine($"\n[Parallel Apply] Applying edit plan: '{Shorten(parallelCmd.EditPlan, 100)}'");
+                sb.AppendLine($"Total regions to edit: {parallelCmd.EditRegions.Count}");
 
                 // Process each region
                 foreach (var region in parallelCmd.EditRegions)
@@ -36,7 +39,7 @@ namespace OpenCursor.Client.Handlers
                     string fullPath = IMcpCommandHandler.GetFullPath(region.RelativeWorkspacePath, workspaceRoot);
                     if (!File.Exists(fullPath))
                     {
-                        Console.WriteLine($"[Parallel Apply] File not found: {region.RelativeWorkspacePath}");
+                        sb.AppendLine($"[Parallel Apply] File not found: {region.RelativeWorkspacePath}");
                         continue;
                     }
 
@@ -55,39 +58,40 @@ namespace OpenCursor.Client.Handlers
                             (region.StartLine.Value < 1 || region.EndLine.Value > lines.Length || 
                             region.StartLine.Value > region.EndLine.Value))
                         {
-                            Console.WriteLine($"[Parallel Apply] Invalid line range for {region.RelativeWorkspacePath}: {region.StartLine}-{region.EndLine}");
+                            sb.AppendLine($"[Parallel Apply] Invalid line range for {region.RelativeWorkspacePath}: {region.StartLine}-{region.EndLine}");
                             continue;
                         }
 
                         // For now, just show what we would edit
                         // In the future, we would implement actual parallel editing logic here
-                        Console.WriteLine($"\nProcessing region: {region.RelativeWorkspacePath}");
-                        Console.WriteLine($"Line range: {region.StartLine ?? 1}-{region.EndLine ?? lines.Length}");
-                        Console.WriteLine($"--- Preview ---");
+                        sb.AppendLine($"\nProcessing region: {region.RelativeWorkspacePath}");
+                        sb.AppendLine($"Line range: {region.StartLine ?? 1}-{region.EndLine ?? lines.Length}");
+                        sb.AppendLine($"--- Preview ---");
                         
                         // Show the lines that would be edited
                         int startLine = region.StartLine ?? 1;
                         int endLine = region.EndLine ?? lines.Length;
                         for (int i = startLine - 1; i < endLine; i++)
                         {
-                            Console.WriteLine($"{i + 1}: {lines[i]}" + (lines[i].Length > 80 ? "..." : ""));
+                            sb.AppendLine($"{i + 1}: {lines[i]}" + (lines[i].Length > 80 ? "..." : ""));
                         }
-                        Console.WriteLine("--- End of Preview ---");
+                        sb.AppendLine("--- End of Preview ---");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error processing region {region.RelativeWorkspacePath}: {ex.Message}");
+                        sb.AppendLine($"Error processing region {region.RelativeWorkspacePath}: {ex.Message}");
                     }
                 }
 
-                Console.WriteLine($"\n[Parallel Apply] Completed processing {parallelCmd.EditRegions.Count} regions");
-                Console.WriteLine("Note: Actual parallel editing is not yet implemented.");
+                sb.AppendLine($"\n[Parallel Apply] Completed processing {parallelCmd.EditRegions.Count} regions");
+                sb.AppendLine("Note: Actual parallel editing is not yet implemented.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error during parallel apply: {ex.Message}");
+                sb.AppendLine($"Error during parallel apply: {ex.Message}");
                 throw;
             }
+            return sb.ToString();
         }
 
         private string Shorten(string text, int maxLength)

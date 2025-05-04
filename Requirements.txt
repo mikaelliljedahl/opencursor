@@ -1,23 +1,21 @@
 # OpenCursor - Intelligent Developer Assistant
 
 ## Purpose
-OpenCursor is a lightweight mix of console and WPF-based tools designed to assist developers in software development with the help of Large Language Models (LLMs). It facilitates:
-- **File Navigation**: Users explore project files interactively and mark those that needs attention
+OpenCursor is a lightweight WPF-based tool designed to assist developers in software development with the help of Large Language Models (LLMs). It facilitates:
 - **Multi-Role LLM Interaction**: Different LLM sessions assist in requirements analysis, development, code verification, and integration.
-- **MCP-Based Code Execution**: LLM-generated suggestions are applied to the codebase using structured commands.
+- **MCP-Based Code Execution**: LLM-generated suggestions are applied to the codebase using structured commands that are sent to the built-in MCP Server.
 
 ---
 
 ## Architecture Overview
 **Components:**
-1. **Console Application** (Helper Interface)
-2. **WPF-Based Browser UI** (User interaction and LLM Interaction)
-3. **Multi-Session LLM Handling**
-4. **Local HTTP Communication & MCP Protocol**
+1. **WPF-Based LLM UI** (User interaction and LLM Interaction)
+2. **Multi-Session LLM Handling**
+3. **Local HTTP Communication & MCP Protocol**
  
 **LLM Roles:**
 - **Requirements Analyst**: Extracts and refines software needs.
-- **Developer Role**: Writes and suggests code modifications.
+- **Developer Role**: Writes and suggests code modifications. (We start implementing this one)
 - **Code Verifier**: Ensures correctness and best practices.
 - **Code Application & MCP Integration**: Applies confirmed changes.
 
@@ -25,24 +23,19 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
 
 ## Key Requirements
 
-### **1. Console Application**
+### **1. WPF Application**
 - **Technology Stack**:  
   - C# (.NET 8 or later)
-  - Uses top-level statements in `Program.cs`
-  - Organized for separation of concerns:
-    - `DirectoryBrowser.cs` (File System Navigation)
-    - `KeyboardNavigator.cs` (Keyboard Interaction)
-    - `LLMClient.cs` and `LLMServer.cs` (LLM Prompt Handling & Code Application)
+  - Uses DI-container to register the required components of the MCP Server to be easilly testable.
+  - Organized for separation of concerns.
+    - MCPServer handles the execution of the MCP-commands
 
 - **User Experience**:
-  - Inspired by classic tools like Norton Commander to select active directory in the console app.
-  - **Keyboard controls**:
-    - Arrow keys → Move cursor.
-    - Tab → Switch panels.
-    - `+` → Select file/directory.
-    - `-` → Deselect file/directory.
-    - Enter → Open folders.
-    - Function keys (`F1`-`F10`) → Special commands.
+  - One chat window for each LLM role.
+  - Displays LLM responses and allows user input.
+  - One settings dialog where user can change the API key and the model endpoint, whether to automatically process changes to files or need user confirmation.
+  - Displays the conversation history.
+
 
 ---
 
@@ -67,13 +60,14 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
 ---
 
 ### **3. Communication Flow**
-- **Local HTTP interactions**:
-  - Console app and the WPF App that hosts the interaction with the LLM will communicate using Websocket connections
+- The WPF app calls an LLM using the Google Gemini API.
+- **Internal component interactions**:
+  - WPF App that hosts the interaction with the LLM will communicate with MCP-server using Websocket connections (but will be replaced with another in-process mechanism).)
     ```
-  - WPF App captures responses and send results to instances of the console application that e.g. can apply code changes:
+  - WPF App captures responses and send results to instances of the MCPServer that e.g. can apply code changes:
     ```
-  - The console app **validates and applies** confirmed changes.
-  - The WPF app could also call an LLM using the Google Gemini API.
+  - The MCPServer **validates and applies** confirmed changes.
+  
 
 
 ---
@@ -82,29 +76,31 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
 - Displays **LLM responses** and refinement options using a builtin UI.
 - Supports **interactive validation** before applying modifications.
 - Tracks **history** of applied changes.
-- Spawn the console app.
+- Spawn the MCPServer.
 
 ---
 
 ## Core Components
 
-1.  **Console Application (`OpenCursor.Client`):**
-    *   Displays the file/directory browser UI.
-    *   Handles keyboard navigation (up, down, enter, space for marking).
-    *   Manages the list of marked files/directories.
-    *   Receives parsed commands (file operations, command execution) from the WPF application via WebSocket.
-    *   Executes the received commands (create/update/delete files, run shell commands) using the McpProcessor.
-    *   Hosts a WebSocket server (`ws://localhost:12346/`) to listen for commands from the WPF app.
-
-2.  **WPF Application (`OpenCursor.BrowserHost`):**
+1.  **WPF Application (`OpenCursor.Host`):**
     *   Provides the main user interface for interacting with the Large Language Model (LLM).
     *   Connects directly to the Google Gemini REST API.
     *   Requires configuration for the Google API Key and Model Endpoint (must handle API key securely).
     *   Displays the conversation history (user prompts and LLM responses).
     *   Allows the user to type and send messages to the LLM via the API.
     *   Loads a system prompt (`systemprompt.md`) to provide context/instructions to the LLM.
-    *   Sends the raw text response received from the Google Gemini API to the Console application via a WebSocket connection (`ws://localhost:12346/`).
-    *   Acts as a WebSocket client connecting to the Console app's server.
+    *   Sends the raw text response received from the Google Gemini API to the built-in MCPServer
+    
+    *   Displays the file/directory browser UI.
+    *   Handles directory navigation.
+    *   Manages the list of marked files/directories.
+
+    
+2.  **WPF Application (`OpenCursor.MCPServer`):**
+
+    *   Receives parsed commands (file operations, command execution) from the WPF application.
+    *   Executes the received commands (create/update/delete files, run shell commands) using the McpProcessor.
+    *   Sends the result back to the Host that communicates with the LLM.
 
 ---
 
@@ -121,15 +117,34 @@ OpenCursor is a lightweight mix of console and WPF-based tools designed to assis
 
 ## Interaction Flow
 
-1.  User navigates filesystem in the Console App.
+1.  User navigates filesystem in the WPF App.
 2.  User interacts with the LLM via the WPF App.
-3.  WPF App sends user message + history + system prompt to Google Gemini API.
-4.  Google Gemini API responds with generated text.
+3.  WPF App sends user message + history + system prompt to the LLM using API.
+4.  LLM API responds with generated text or commands
 5.  WPF App displays the LLM response.
-6.  WPF App sends the raw LLM response string to the Console App via WebSocket.
+6.  WPF App sends the raw LLM response string to the MCPServer (currently via WebSocket but should be internal).
 7.  Console App's WebSocket server receives the string.
-8.  Console App parses the string for XML-like commands (`<create_file>`, `<execute_command>`, etc.) using `LlmResponseParser`.
+8.  Console App parses the string for JSON-like commands 
 9.  Console App executes the parsed commands using `McpProcessor` relative to its current directory.
+
+Example of a command that the LLM could send to the console app. The "explanation" below will be shown to the user in the WPF app:
+AI: ```tool_code
+{
+  "agent_name": "Agent",
+  "tools": [
+    {
+      "tool_name": "read_file",
+      "parameters": {
+        "relative_workspace_path": "requirements.txt",
+        "should_read_entire_file": true,
+        "start_line_one_indexed": 1,
+        "end_line_one_indexed_inclusive": 250,
+        "explanation": "You asked me to read the requirements.txt file, so I will read the entire file to fulfill your request."
+      }
+    }
+  ]
+}
+```
 
 ---
 

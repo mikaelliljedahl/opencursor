@@ -2,6 +2,7 @@ using OpenCursor.Client.Commands;
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace OpenCursor.Client.Handlers
 {
@@ -10,8 +11,8 @@ namespace OpenCursor.Client.Handlers
         public string CommandName => "codebase_search";
 
         public bool CanHandle(IMcpCommand command) => command is CodebaseSearchCommand;
-
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             if (command is not CodebaseSearchCommand searchCmd)
             {
@@ -20,13 +21,15 @@ namespace OpenCursor.Client.Handlers
 
             if (string.IsNullOrWhiteSpace(searchCmd.Query))
             {
-                Console.WriteLine("[Codebase Search] Empty query provided.");
-                return;
+                return ("[Codebase Search] Empty query provided.");
+                
             }
 
             Console.WriteLine($"\n[Codebase Search] Searching for: '{searchCmd.Query}'");
             Console.WriteLine($"Search scope: {(searchCmd.TargetDirectories == null ? "(workspace root)" : string.Join(", ", searchCmd.TargetDirectories))}");
             Console.WriteLine("--- Results ---");
+
+            StringBuilder sb = new StringBuilder();
 
             try
             {
@@ -38,7 +41,7 @@ namespace OpenCursor.Client.Handlers
                     string fullPath = IMcpCommandHandler.GetFullPath(dir, workspaceRoot);
                     if (!Directory.Exists(fullPath))
                     {
-                        Console.WriteLine($"[Codebase Search] Directory not found: {dir}");
+                        return $"[Codebase Search] Directory not found: {dir}";
                         continue;
                     }
 
@@ -70,27 +73,31 @@ namespace OpenCursor.Client.Handlers
                             if (matchingLines.Any())
                             {
                                 var relativePath = Path.GetRelativePath(workspaceRoot, file);
-                                Console.WriteLine($"\nFile: {relativePath}");
+                                sb.AppendLine($"\nFile: {relativePath}");
                                 foreach (var match in matchingLines)
                                 {
-                                    Console.WriteLine($"Line {match.Number}: {match.Line.Trim()}" +
+                                    sb.AppendLine($"Line {match.Number}: {match.Line.Trim()}" +
                                         (match.Line.Length > 80 ? "..." : ""));
                                 }
                             }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Error searching file {file}: {ex.Message}");
+                            sb.AppendLine($"Error searching file {file}: {ex.Message}");
                         }
                     }
                 }
+                return sb.ToString();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error during codebase search: {ex.Message}");
-                throw;
+                return ($"Error during codebase search: {ex.Message}");
+                
             }
-            Console.WriteLine("--- End of Results ---");
+
+            
+
+            //Console.WriteLine("--- End of Results ---");
         }
 
 

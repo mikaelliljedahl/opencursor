@@ -1,6 +1,7 @@
 using OpenCursor.Client.Commands;
 using System;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace OpenCursor.Client.Handlers
@@ -11,7 +12,7 @@ namespace OpenCursor.Client.Handlers
 
         public bool CanHandle(IMcpCommand command) => command is GrepSearchCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             if (command is not GrepSearchCommand grepCmd)
             {
@@ -20,8 +21,8 @@ namespace OpenCursor.Client.Handlers
 
             if (string.IsNullOrWhiteSpace(grepCmd.Query))
             {
-                Console.WriteLine("[Grep Search] Empty query provided.");
-                return;
+                return "[Grep Search] Empty query provided.";
+                
             }
 
             Console.WriteLine($"\n[Grep Search] Searching for pattern: '{grepCmd.Query}'");
@@ -29,6 +30,8 @@ namespace OpenCursor.Client.Handlers
             Console.WriteLine($"Include Pattern: {grepCmd.IncludePattern ?? "(none)"}");
             Console.WriteLine($"Exclude Pattern: {grepCmd.ExcludePattern ?? "(none)"}");
             Console.WriteLine("--- Results ---");
+
+            StringBuilder sb = new StringBuilder();
 
             try
             {
@@ -68,26 +71,28 @@ namespace OpenCursor.Client.Handlers
                         var matches = lines.Where(l => regex.IsMatch(l.Line));
                         if (matches.Any())
                         {
-                            Console.WriteLine($"\nFile: {relativePath}");
+                            sb.AppendLine($"\nFile: {relativePath}");
                             foreach (var match in matches)
                             {
-                                Console.WriteLine($"Line {match.Number}: {match.Line.Trim()}" +
+                                sb.AppendLine($"Line {match.Number}: {match.Line.Trim()}" +
                                     (match.Line.Length > 80 ? "..." : ""));
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error searching file {file}: {ex.Message}");
+                        sb.AppendLine($"Error searching file {file}: {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error during grep search: {ex.Message}");
+                sb.AppendLine($"Error during grep search: {ex.Message}");
                 throw;
             }
-            Console.WriteLine("--- End of Results ---");
+            sb.AppendLine("--- End of Results ---");
+
+            return sb.ToString();
         }
     }
 }

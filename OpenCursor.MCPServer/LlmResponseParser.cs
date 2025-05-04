@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -29,6 +30,11 @@ namespace OpenCursor.Client
             // Add other options like custom converters if necessary
         };
 
+        /// <summary>
+        /// Parse commands from the LLM response.
+        /// </summary>
+        /// <param name="llmResponse"></param>
+        /// <returns></returns>
         public IEnumerable<IMcpCommand> ParseCommands(string llmResponse)
         {
             if (string.IsNullOrWhiteSpace(llmResponse))
@@ -36,8 +42,14 @@ namespace OpenCursor.Client
                 yield break; // No commands to parse
             }
 
+
             // Basic cleanup: Trim whitespace and potential markdown code fences
             string jsonContent = llmResponse.Trim();
+
+
+            if (!jsonContent.Contains("'''"))
+                yield break; // No code fences to process
+
             if (jsonContent.StartsWith("```json"))
             {
                 jsonContent = jsonContent.Substring(7);
@@ -105,92 +117,88 @@ namespace OpenCursor.Client
             foreach (var request in commandRequests)
             {
                 IMcpCommand? command = null;
-                try
+
+
+                // Find the appropriate command type based on the command name
+                var handler = McpCommandHandlerRegistry.CreateHandler(request.Name);
+
+                if (handler == null)
+                {
+                    continue;
+                    // throw new InvalidOperationException($"No handler found for command '{request.Name}'");
+                }
+
+
+                if (handler != null)
                 {
 
-                    // Find the appropriate command type based on the command name
-                    var handler = McpCommandHandlerRegistry.CreateHandler(request.Name);
+                    // Deserialize using the found command type
+                    command = request as IMcpCommand;
 
-                    if (handler == null)
+                    // Handle null content fields for specific commands
+                    if (command is CreateFileCommand cfCmd) cfCmd.Content ??= string.Empty;
+                    if (command is UpdateFileCommand ufCmd) ufCmd.Content ??= string.Empty;
+                    if (command is EditFileCommand efCmd) efCmd.CodeEdit ??= string.Empty;
+
+                    // Validate required fields for specific commands
+                    if (command is ListDirCommand ldCmd && string.IsNullOrWhiteSpace(ldCmd.RelativePath))
                     {
-                        continue;
-                        // throw new InvalidOperationException($"No handler found for command '{request.Name}'");
+                        Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for list_dir command.");
+                        command = null;
+                    }
+                    else if (command is DeleteFileCommand delCmd && string.IsNullOrWhiteSpace(delCmd.TargetFile))
+                    {
+                        Console.WriteLine($"LLM Response Parser: Missing 'target_file' for delete_file command.");
+                        command = null;
+                    }
+                    else if (command is ReadFileCommand rfCmd && string.IsNullOrWhiteSpace(rfCmd.RelativePath))
+                    {
+                        Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for read_file command.");
+                        command = null;
+                    }
+                    else if (command is CodebaseSearchCommand csCmd && string.IsNullOrWhiteSpace(csCmd.Query))
+                    {
+                        Console.WriteLine($"LLM Response Parser: Missing 'query' for codebase_search command.");
+                        command = null;
+                    }
+                    else if (command is RunTerminalCommand rtCmd && string.IsNullOrWhiteSpace(rtCmd.CommandLine))
+                    {
+                        Console.WriteLine($"LLM Response Parser: Missing 'command' for run_terminal_cmd command.");
+                        command = null;
+                    }
+                    else if (command is GrepSearchCommand gsCmd && string.IsNullOrWhiteSpace(gsCmd.Query))
+                    {
+                        Console.WriteLine($"LLM Response Parser: Missing 'query' for grep_search command.");
+                        command = null;
+                    }
+                    else if (command is FileSearchCommand fsCmd && string.IsNullOrWhiteSpace(fsCmd.Query))
+                    {
+                        Console.WriteLine($"LLM Response Parser: Missing 'query' for file_search command.");
+                        command = null;
+                    }
+                    else if (command is ReapplyCommand raCmd && string.IsNullOrWhiteSpace(raCmd.TargetFile))
+                    {
+                        Console.WriteLine($"LLM Response Parser: Missing 'target_file' for reapply command.");
+                        command = null;
+                    }
+                    else if (command is ParallelApplyCommand paCmd &&
+                        (string.IsNullOrWhiteSpace(paCmd.EditPlan) || paCmd.EditRegions == null || !paCmd.EditRegions.Any()))
+                    {
+                        Console.WriteLine($"LLM Response Parser: Missing required parameter(s) for parallel_apply command (edit_plan, edit_regions).");
+                        command = null;
                     }
 
-
-                    if (handler != null)
+                    if (command != null)
                     {
-                        // Deserialize using the found command type
-                        command = request.Parameters.Deserialize(handler, _jsonOptions) as IMcpCommand;
-                        
-                        // Handle null content fields for specific commands
-                        if (command is CreateFileCommand cfCmd) cfCmd.Content ??= string.Empty;
-                        if (command is UpdateFileCommand ufCmd) ufCmd.Content ??= string.Empty;
-                        if (command is EditFileCommand efCmd) efCmd.CodeEdit ??= string.Empty;
-
-                        // Validate required fields for specific commands
-                        if (command is ListDirCommand ldCmd && string.IsNullOrWhiteSpace(ldCmd.RelativePath))
-                        {
-                            Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for list_dir command.");
-                            command = null;
-                        }
-                        else if (command is DeleteFileCommand delCmd && string.IsNullOrWhiteSpace(delCmd.TargetFile))
-                        {
-                            Console.WriteLine($"LLM Response Parser: Missing 'target_file' for delete_file command.");
-                            command = null;
-                        }
-                        else if (command is ReadFileCommand rfCmd && string.IsNullOrWhiteSpace(rfCmd.RelativePath))
-                        {
-                            Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for read_file command.");
-                            command = null;
-                        }
-                        else if (command is CodebaseSearchCommand csCmd && string.IsNullOrWhiteSpace(csCmd.Query))
-                        {
-                            Console.WriteLine($"LLM Response Parser: Missing 'query' for codebase_search command.");
-                            command = null;
-                        }
-                        else if (command is RunTerminalCommand rtCmd && string.IsNullOrWhiteSpace(rtCmd.CommandLine))
-                        {
-                            Console.WriteLine($"LLM Response Parser: Missing 'command' for run_terminal_cmd command.");
-                            command = null;
-                        }
-                        else if (command is GrepSearchCommand gsCmd && string.IsNullOrWhiteSpace(gsCmd.Query))
-                        {
-                            Console.WriteLine($"LLM Response Parser: Missing 'query' for grep_search command.");
-                            command = null;
-                        }
-                        else if (command is FileSearchCommand fsCmd && string.IsNullOrWhiteSpace(fsCmd.Query))
-                        {
-                            Console.WriteLine($"LLM Response Parser: Missing 'query' for file_search command.");
-                            command = null;
-                        }
-                        else if (command is ReapplyCommand raCmd && string.IsNullOrWhiteSpace(raCmd.TargetFile))
-                        {
-                            Console.WriteLine($"LLM Response Parser: Missing 'target_file' for reapply command.");
-                            command = null;
-                        }
-                        else if (command is ParallelApplyCommand paCmd && 
-                            (string.IsNullOrWhiteSpace(paCmd.EditPlan) || paCmd.EditRegions == null || !paCmd.EditRegions.Any()))
-                        {
-                            Console.WriteLine($"LLM Response Parser: Missing required parameter(s) for parallel_apply command (edit_plan, edit_regions).";
-                            command = null;
-                        }
-
-                        if (command != null)
-                        {
-                            yield return command;
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"LLM Response Parser: No command type found for: {request.Name}");
+                        yield return command;
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    Console.WriteLine($"LLM Response Parser: Error parsing command {request.Name}: {ex.Message}");
+                    Console.WriteLine($"LLM Response Parser: No command type found for: {request.Name}");
                 }
-            }
+
+            
 
                 if (command != null)
                 {
@@ -198,6 +206,5 @@ namespace OpenCursor.Client
                 }
             }
         }
-        // Note: Removed old XML parsing methods like ExtractCommand, ExtractParameter, UnescapeXml
     }
 }

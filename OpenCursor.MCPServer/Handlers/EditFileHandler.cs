@@ -1,6 +1,7 @@
 using OpenCursor.Client.Commands;
 using System;
 using System.IO;
+using System.Text;
 
 namespace OpenCursor.Client.Handlers
 {
@@ -14,7 +15,7 @@ namespace OpenCursor.Client.Handlers
         {
             if (command is not EditFileCommand editCmd)
             {
-                throw new ArgumentException($"Expected EditFileCommand, got {command.GetType().Name}");
+                return $"Expected EditFileCommand, got {command.GetType().Name}";
             }
 
             if (string.IsNullOrWhiteSpace(editCmd.TargetFile))
@@ -28,13 +29,16 @@ namespace OpenCursor.Client.Handlers
                 return "[File Edit] Empty code edit provided.";
                 
             }
+          
+            StringBuilder sb = new StringBuilder();
             // Create backup of the original file
-            string fullPath = IMcpCommandHandler.GetFullPath(editCmd.TargetFile, workspaceRoot );
+            string fullPath = IMcpCommandHandler.GetFullPath(editCmd.TargetFile, workspaceRoot);
 
             try
             {
-               
-                string backupPath = fullPath + ".bak";
+                
+
+                string backupPath = fullPath + ".bak"; // maybe we should put it in another folder, but for now we keep them in the same, requires .gitignore to include .bak
                 File.Copy(fullPath, backupPath, true);
 
                 // Read the original file
@@ -46,21 +50,21 @@ namespace OpenCursor.Client.Handlers
                 File.WriteAllText(fullPath, editCmd.CodeEdit);
 
                 // Log the changes
-                Console.WriteLine($"\n[File Edit] Successfully edited: {Path.GetRelativePath(workspaceRoot, fullPath)}");
-                Console.WriteLine($"Backup created at: {Path.GetRelativePath(workspaceRoot, backupPath)}");
-                Console.WriteLine($"Instructions: {editCmd.Instructions}");
+                sb.AppendLine($"\n[File Edit] Successfully edited: {Path.GetRelativePath(workspaceRoot, fullPath)}");
+                sb.AppendLine($"Backup created at: {Path.GetRelativePath(workspaceRoot, backupPath)}");
+                sb.AppendLine($"Instructions: {editCmd.Instructions}");
 
                 // Show a preview of the changes
-                Console.WriteLine("\n--- Changes ---");
-                Console.WriteLine($"Original lines: {originalLines.Length}");
-                Console.WriteLine($"New lines: {editCmd.CodeEdit.Split(new[] { Environment.NewLine }, StringSplitOptions.None).Length}");
-                Console.WriteLine("--- End of Changes ---");
+                sb.AppendLine("\n--- Changes ---");
+                sb.AppendLine($"Original lines: {originalLines.Length}");
+                sb.AppendLine($"New lines: {editCmd.CodeEdit.Split(new[] { Environment.NewLine }, StringSplitOptions.None).Length}");
+                sb.AppendLine("--- End of Changes ---");
 
                 // TODO: Implement more sophisticated diff viewing
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error during file edit: {ex.Message}");
+                sb.AppendLine($"Error during file edit: {ex.Message}");
                 // If there was an error, restore from backup if it exists
                 string backupPath = fullPath + ".bak";
                 if (File.Exists(backupPath))
@@ -68,15 +72,17 @@ namespace OpenCursor.Client.Handlers
                     try
                     {
                         File.Copy(backupPath, fullPath, true);
-                        Console.WriteLine($"Restored from backup: {Path.GetRelativePath(workspaceRoot, fullPath)}");
+                        sb.AppendLine($"Restored from backup: {Path.GetRelativePath(workspaceRoot, fullPath)}");
                     }
                     catch
                     {
-                        Console.WriteLine($"Failed to restore from backup: {ex.Message}");
+                        sb.AppendLine($"Failed to restore from backup: {ex.Message}");
                     }
                 }
                 throw;
             }
+
+            return sb.ToString();
         }
 
     }

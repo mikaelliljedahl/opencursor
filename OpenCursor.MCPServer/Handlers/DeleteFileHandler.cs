@@ -12,7 +12,7 @@ namespace OpenCursor.Client.Handlers
 
         public bool CanHandle(IMcpCommand command) => command is DeleteFileCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             if (command is not DeleteFileCommand deleteCmd)
             {
@@ -22,19 +22,19 @@ namespace OpenCursor.Client.Handlers
             string fullPath = IMcpCommandHandler.GetFullPath(deleteCmd.TargetFile, workspaceRoot);
             if (!File.Exists(fullPath))
             {
-                Console.WriteLine($"[Delete File] File not found: {deleteCmd.TargetFile}");
-                return;
+                return $"[Delete File] File not found: {deleteCmd.TargetFile}";
+                
             }
 
             try
             {
                 File.Delete(fullPath);
-                Console.WriteLine($"\n[Delete File] Successfully deleted: {Path.GetRelativePath(workspaceRoot, fullPath)}");
+                return $"\n[Delete File] Successfully deleted: {Path.GetRelativePath(workspaceRoot, fullPath)}";
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error deleting file: {ex.Message}");
-                throw;
+                return $"Error deleting file: {ex.Message}";
+                
             }
         }
 

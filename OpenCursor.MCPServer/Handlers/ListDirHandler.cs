@@ -1,6 +1,7 @@
 using OpenCursor.Client.Commands;
 using System;
 using System.IO;
+using System.Text;
 
 namespace OpenCursor.Client.Handlers
 {
@@ -10,7 +11,7 @@ namespace OpenCursor.Client.Handlers
 
         public bool CanHandle(IMcpCommand command) => command is ListDirCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             if (command is not ListDirCommand listCmd)
             {
@@ -20,30 +21,33 @@ namespace OpenCursor.Client.Handlers
             string fullPath = IMcpCommandHandler.GetFullPath(listCmd.RelativePath, workspaceRoot);
             if (!Directory.Exists(fullPath))
             {
-                Console.WriteLine($"[List Directory] Directory not found: {listCmd.RelativePath}");
-                return;
+                return $"[List Directory] Directory not found: {listCmd.RelativePath}";
+                
             }
-
+            StringBuilder sb = new StringBuilder();
             try
             {
-                Console.WriteLine($"\n[List Directory] Contents of: {listCmd.RelativePath}");
+                
+                sb.AppendLine($"\n[List Directory] Contents of: {listCmd.RelativePath}");
                 // List Directories
                 foreach (var dir in Directory.GetDirectories(fullPath))
                 {
-                    Console.WriteLine($"[D] {Path.GetFileName(dir)}");
+                    sb.AppendLine($"[D] {Path.GetFileName(dir)}");
                 }
                 // List Files
                 foreach (var file in Directory.GetFiles(fullPath))
                 {
-                    Console.WriteLine($"[F] {Path.GetFileName(file)}");
+                    sb.AppendLine($"[F] {Path.GetFileName(file)}");
                 }
-                Console.WriteLine("--- End of Listing ---");
+                sb.AppendLine("--- End of Listing ---");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error listing directory: {ex.Message}");
+                sb.AppendLine($"Error listing directory: {ex.Message}");
                 throw;
             }
+
+            return sb.ToString();
         }
 
 

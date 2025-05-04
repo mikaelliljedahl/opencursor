@@ -1,6 +1,7 @@
 using OpenCursor.Client.Commands;
 using System;
 using System.Diagnostics;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace OpenCursor.Client.Handlers
@@ -12,16 +13,18 @@ namespace OpenCursor.Client.Handlers
 
         public bool CanHandle(IMcpCommand command) => command is RunTerminalCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             if (command is not RunTerminalCommand terminalCmd)
             {
                 throw new ArgumentException($"Expected RunTerminalCommand, got {command.GetType().Name}");
             }
 
+            StringBuilder sb = new StringBuilder();
+
             try
             {
-                Console.WriteLine($"\n[Run Terminal] Attempting to run: {terminalCmd.CommandLine}");
+                sb.AppendLine($"\n[Run Terminal] Attempting to run: {terminalCmd.CommandLine}");
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
@@ -44,23 +47,25 @@ namespace OpenCursor.Client.Handlers
                     if (!terminalCmd.IsBackground)
                     {
                         await process.WaitForExitAsync();
-                        Console.WriteLine("--- Command Output ---");
-                        if (!string.IsNullOrWhiteSpace(output)) Console.WriteLine(output);
+                        sb.AppendLine("--- Command Output ---");
+                        if (!string.IsNullOrWhiteSpace(output)) sb.AppendLine(output);
                         if (!string.IsNullOrWhiteSpace(error)) Console.Error.WriteLine(error);
-                        Console.WriteLine($"--- Command Finished (Exit Code: {process.ExitCode}) ---");
+                        sb.AppendLine($"--- Command Finished (Exit Code: {process.ExitCode}) ---");
                         if (process.ExitCode != 0) throw new Exception($"Command failed with exit code {process.ExitCode}");
                     }
                     else
                     {
-                        Console.WriteLine($"Command started in background (PID: {process.Id})");
+                        sb.AppendLine($"Command started in background (PID: {process.Id})");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Failed to run command '{terminalCmd.CommandLine}': {ex.Message}");
-                throw;
+                return $"Failed to run command '{terminalCmd.CommandLine}': {ex.Message}";
+                
             }
+
+            return sb.ToString();
         }
     }
 }

@@ -9,14 +9,14 @@ namespace OpenCursor.Client.Handlers
         public string CommandName => "create_file";
         public bool CanHandle(IMcpCommand command) => command is CreateFileCommand;
 
-        public async Task HandleCommand(IMcpCommand command, string workspaceRoot)
+        public async Task<string> HandleCommand(IMcpCommand command, string workspaceRoot)
         {
             var createCommand = (CreateFileCommand)command;
             string fullPath = Path.Combine(workspaceRoot, createCommand.RelativePath);
 
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
             await File.WriteAllTextAsync(fullPath, createCommand.Content ?? string.Empty);
-            Console.WriteLine($"File created: {fullPath}");
+            return ($"File created: {fullPath}");
         }
     }
 }
