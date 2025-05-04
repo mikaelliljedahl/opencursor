@@ -1,0 +1,179 @@
+# OpenCursor - Intelligent Developer Assistant
+
+## Purpose
+OpenCursor is a lightweight WPF-based tool designed to assist developers in software development with the help of Large Language Models (LLMs). It facilitates:
+- **Multi-Role LLM Interaction**: Different LLM sessions assist in requirements analysis, development, code verification, and integration.
+- **MCP-Based Code Execution**: LLM-generated suggestions are applied to the codebase using structured commands that are sent to the built-in MCP Server.
+
+---
+
+## Architecture Overview
+**Components:**
+1. **WPF-Based LLM UI** (User interaction and LLM Interaction)
+2. **Multi-Session LLM Handling**
+3. **Local HTTP Communication & MCP Protocol**
+ 
+**LLM Roles:**
+- **Requirements Analyst**: Extracts and refines software needs.
+- **Developer Role**: Writes and suggests code modifications. (We start implementing this one)
+- **Code Verifier**: Ensures correctness and best practices.
+- **Code Application & MCP Integration**: Applies confirmed changes.
+
+---
+
+## Key Requirements
+
+### **1. WPF Application**
+- **Technology Stack**:  
+  - C# (.NET 8 or later)
+  - Uses DI-container to register the required components of the MCP Server to be easilly testable.
+  - Organized for separation of concerns.
+    - MCPServer handles the execution of the MCP-commands
+
+- **User Experience**:
+  - One chat window for each LLM role.
+  - Displays LLM responses and allows user input.
+  - One settings dialog where user can change the API key and the model endpoint, whether to automatically process changes to files or need user confirmation.
+  - Displays the conversation history.
+
+
+---
+
+### **2. LLM Communication & MCP Protocol**
+- **Multi-Session LLM Handling**:
+  - Separate interactions for requirements analysis, development, and validation.
+  - Server implemented according to: https://github.com/modelcontextprotocol/csharp-sdk
+
+- **Prompt Construction**:
+  - Collects selected files and directories.
+  - Instructions for allowed actions:
+    - File creation, updates, deletion.
+    - Searching for relevant code snippets/classes.
+  - Includes:
+    - Marked file paths.
+    - Relevant file contents.
+    - Contextual directory insights.
+
+- **Model Context Protocol Based Code Execution**:
+  - Commands that should be available for the LLM will be called using the MCP protocol:
+    
+---
+
+### **3. Communication Flow**
+- The WPF app calls an LLM using the Google Gemini API.
+- **Internal component interactions**:
+  - WPF App that hosts the interaction with the LLM will communicate with MCP-server using Websocket connections (but will be replaced with another in-process mechanism).)
+    ```
+  - WPF App captures responses and send results to instances of the MCPServer that e.g. can apply code changes:
+    ```
+  - The MCPServer **validates and applies** confirmed changes.
+  
+
+
+---
+
+### **4. WPF-Based UI**
+- Displays **LLM responses** and refinement options using a builtin UI.
+- Supports **interactive validation** before applying modifications.
+- Tracks **history** of applied changes.
+- Spawn the MCPServer.
+
+---
+
+## Core Components
+
+1.  **WPF Application (`OpenCursor.Host`):**
+    *   Provides the main user interface for interacting with the Large Language Model (LLM).
+    *   Connects directly to the Google Gemini REST API.
+    *   Requires configuration for the Google API Key and Model Endpoint (must handle API key securely).
+    *   Displays the conversation history (user prompts and LLM responses).
+    *   Allows the user to type and send messages to the LLM via the API.
+    *   Loads a system prompt (`systemprompt.md`) to provide context/instructions to the LLM.
+    *   Sends the raw text response received from the Google Gemini API to the built-in MCPServer
+    
+    *   Displays the file/directory browser UI.
+    *   Handles directory navigation.
+    *   Manages the list of marked files/directories.
+
+    
+2.  **WPF Application (`OpenCursor.MCPServer`):**
+
+    *   Receives parsed commands (file operations, command execution) from the WPF application.
+    *   Executes the received commands (create/update/delete files, run shell commands) using the McpProcessor.
+    *   Sends the result back to the Host that communicates with the LLM.
+
+---
+
+## Technology Stack
+
+*   .NET (latest stable version, e.g., .NET 8)
+*   C#
+*   WPF for the GUI application (`OpenCursor.BrowserHost`)
+*   Console Application (`OpenCursor.Client`)
+*   System.Net.Http for Google Gemini API calls.
+*   System.Net.WebSockets for communication between WPF and Console apps.
+*   System.Text.Json for API request/response serialization.
+*   (Optional) Configuration system for API keys/endpoints (e.g., appsettings.json, User Secrets).
+
+## Interaction Flow
+
+1.  User navigates filesystem in the WPF App.
+2.  User interacts with the LLM via the WPF App.
+3.  WPF App sends user message + history + system prompt to the LLM using API.
+4.  LLM API responds with generated text or commands
+5.  WPF App displays the LLM response.
+6.  WPF App sends the raw LLM response string to the MCPServer (currently via WebSocket but should be internal).
+7.  Console App's WebSocket server receives the string.
+8.  Console App parses the string for JSON-like commands 
+9.  Console App executes the parsed commands using `McpProcessor` relative to its current directory.
+
+Example of a command that the LLM could send to the console app. The "explanation" below will be shown to the user in the WPF app:
+AI: ```tool_code
+{
+  "agent_name": "Agent",
+  "tools": [
+    {
+      "tool_name": "read_file",
+      "parameters": {
+        "relative_workspace_path": "requirements.txt",
+        "should_read_entire_file": true,
+        "start_line_one_indexed": 1,
+        "end_line_one_indexed_inclusive": 250,
+        "explanation": "You asked me to read the requirements.txt file, so I will read the entire file to fulfill your request."
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Supported Client Commands (JSON Function Calls from LLM):
+
+The Console Client (`OpenCursor.Client`) must parse and execute the following commands received as JSON objects within the LLM's response via the WebSocket connection:
+
+1.  **`codebase_search`**: Performs semantic search.
+    *   `parameters`: `query` (string), `target_directories` (string[]?)
+2.  **`read_file`**: Reads content from a file.
+    *   `parameters`: `relative_workspace_path` (string), `should_read_entire_file` (bool), `start_line_one_indexed` (int?), `end_line_one_indexed_inclusive` (int?)
+3.  **`run_terminal_cmd`**: Executes a shell command.
+    *   `parameters`: `command` (string), `is_background` (bool), `require_user_approval` (bool)
+4.  **`list_dir`**: Lists contents of a directory.
+    *   `parameters`: `relative_workspace_path` (string)
+5.  **`grep_search`**: Performs text/regex search (like ripgrep).
+    *   `parameters`: `query` (string), `case_sensitive` (bool?), `include_pattern` (string?), `exclude_pattern` (string?)
+6.  **`file_search`**: Fuzzy finds files by path.
+    *   `parameters`: `query` (string)
+7.  **`delete_file`**: Deletes a specified file.
+    *   `parameters`: `target_file` (string) (Mapped to `RelativePath` in C# class)
+
+(Note: Commands like `edit_file`, `reapply`, `parallel_apply` are instructions for the LLM agent itself and are not processed by the client.)
+
+---
+
+## Future Enhancements
+- **Plugin System**: Allows extensibility.
+- **LLM Multi-Agent Collaboration**: Dynamic role-switching for different needs.
+- **Code Refactoring Assistance**: Suggests improvements.
+- **Automated Debugging & Error Detection**.
+- **Inline Comments for Code Rationalization**.

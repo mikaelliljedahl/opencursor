@@ -1,0 +1,69 @@
+<Window x:Class="OpenCursor.BrowserHost.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:OpenCursor.BrowserHost"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        mc:Ignorable="d"
+        Title="OpenCursor LLM Interaction"
+        Height="700" Width="900"
+        Loaded="Window_Loaded"
+        Closing="Window_Closing"> 
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />      <!-- Chat Display Area -->
+            <RowDefinition Height="Auto" />   <!-- Input Area -->
+        </Grid.RowDefinitions>
+
+        <!-- Chat History Display -->
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Name="ChatScrollViewer">
+            <ItemsControl Name="ChatHistoryDisplay">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="5" Margin="0,2">
+                            <!-- Use a ReadOnly TextBox for selection/copy -->
+                            <TextBox Text="{Binding Mode=OneWay}" 
+                                     TextWrapping="Wrap"
+                                     IsReadOnly="True"
+                                     BorderThickness="0" 
+                                     Background="Transparent" 
+                                     IsReadOnlyCaretVisible="False"/>
+                            <!-- TODO: Enhance template to show user/AI differentiation -->
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Input Area -->
+        <Grid Grid.Row="1" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />      <!-- Input TextBox -->
+                <ColumnDefinition Width="Auto" />   <!-- Send Button -->
+            </Grid.ColumnDefinitions>
+
+            <TextBox Name="UserInputTextBox"
+                     Grid.Column="0"
+                     AcceptsReturn="True" 
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     MinHeight="40" 
+                     MaxHeight="120" 
+                     VerticalContentAlignment="Center"
+                     Padding="5"
+                     Margin="0,0,5,0"/>
+                     <!-- TODO: Add KeyDown handler for Enter/Shift+Enter -->
+            
+            <Button Name="SendButton" 
+                    Grid.Column="1" 
+                    Content="Send"
+                    Width="75" 
+                    Height="40"
+                    VerticalAlignment="Bottom"
+                    Click="SendButton_Click"/> 
+                    <!-- TODO: Implement SendButton_Click -->
+        </Grid>
+
+    </Grid>
+</Window>
