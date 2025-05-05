@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
@@ -9,7 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.4" />
+    <!--<PackageReference Include="Microsoft.SemanticKernel.Connectors.Google" Version="1.48.0-alpha" />-->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
     <PackageReference Include="ModelContextProtocol" Version="0.1.0-preview.11" />
   </ItemGroup>
@@ -18,10 +20,8 @@
     <ProjectReference Include="..\OpenCursor.MCPServer\OpenCursor.MCPServer.csproj" />
   </ItemGroup>
 
+
   <ItemGroup>
-    <None Update="injectAndSubmit.js">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="SystemPrompt\systemprompt.md">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

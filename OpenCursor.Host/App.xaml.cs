@@ -1,17 +1,22 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenCursor.Host.LlmClient;
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 
-namespace OpenCursor.BrowserHost
+
+namespace OpenCursor.Host
 {
     /// <summary>
     /// Interaction logic for App.xaml
     /// </summary>
     public partial class App : Application
     {
-        private Process _clientProcess;
-        private readonly IHost _host;
+        private Process _mcProcess;
+        private IHost _host;
+        private StreamWriter _mcInput;
 
         public App()
         {
@@ -29,6 +34,7 @@ namespace OpenCursor.BrowserHost
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
             mainWindow.Show();
 
+            StartMcpServer();
             base.OnStartup(e);
         }
 
@@ -36,10 +42,10 @@ namespace OpenCursor.BrowserHost
         protected override async void OnExit(ExitEventArgs e)
         {
             // Ensure the client process is terminated when the host exits
-            if (_clientProcess != null && !_clientProcess.HasExited)
+            if (_mcProcess != null && !_mcProcess.HasExited)
             {
-                _clientProcess.Kill();
-                _clientProcess.Dispose();
+                _mcProcess.Kill();
+                _mcProcess.Dispose();
             }
 
             // Properly shut down the host
@@ -51,39 +57,92 @@ namespace OpenCursor.BrowserHost
             base.OnExit(e);
         }
 
-        private static IHostBuilder CreateHostBuilder() =>
-            Host.CreateDefaultBuilder()
+        private static IHostBuilder CreateHostBuilder()
+        {
+
+            var builder = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder()
                 .ConfigureServices((hostContext, services) =>
                 {
                     // Register your services here
                     ConfigureServices(services);
                 });
 
+            //var mcpService = builder.AddConnectionString("OpenCursorMCPServerConnectionName");
+
+            //var mcpServer = builder.AddProject<OpenCursor_MCPServer>("OpenCursorMCPServer")
+            //    .WithReference(mcpService);
+
+
+            return builder;
+
+        }
+
         private static void ConfigureServices(IServiceCollection services)
         {
             // Register WPF windows
             services.AddSingleton<MainWindow>();
+            services.AddSingleton<StreamTransport>();
+            services.AddSingleton<GeminiChatClient>();
 
-            var assembly = typeof(MCPServer.MCPServer).Assembly;
-            var serializerOptions = new System.Text.Json.JsonSerializerOptions()
+            services.AddChatClient(factory =>
             {
-                PropertyNameCaseInsensitive = true
+                var client = factory.GetRequiredService<GeminiChatClient>(); // Can easilly be replaced with a different client
+                client.AsBuilder()
+                .UseFunctionInvocation() // magic that makes the client call functions
+                .Build();
+                return client;
+            });
+
+            // Now connect the MCP client to the ChatClient
+            // _mcInput is input to MCP server
+
+        }
+
+        private void StartMcpServer()
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "OpenCursor.MCPServer.exe", // or full path
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
             };
 
-            var inputStream = new System.IO.MemoryStream();
-            var outputStream = new System.IO.MemoryStream();
+            _mcProcess = new Process { StartInfo = startInfo };
+            _mcProcess.EnableRaisingEvents = true;
 
-            services.AddMcpServer()
-                .WithStreamServerTransport(inputStream, outputStream)
-                .WithToolsFromAssembly(assembly, serializerOptions);
+            // Handle output
+            _mcProcess.OutputDataReceived += (sender, args) => {
+                if (!string.IsNullOrEmpty(args.Data))
+                    Dispatcher.Invoke(() => HandleServerOutput(args.Data));
+            };
 
-            // Register your view models
-            // services.AddSingleton<MainViewModel>();
+            // Handle errors
+            _mcProcess.ErrorDataReceived += (sender, args) => {
+                if (!string.IsNullOrEmpty(args.Data))
+                    Dispatcher.Invoke(() => HandleServerError(args.Data));
+            };
 
-            // Register your services, e.g. MCP-services should be moved from static creation inside the mainwindow to be places in the DI-container
-            // services.AddSingleton<IYourService, YourService>();
-            // services.AddScoped<IScopedService, ScopedService>();
-            // services.AddTransient<ITransientService, TransientService>();
+            _mcProcess.Start();
+
+            // Set up async output reading
+            _mcProcess.BeginOutputReadLine();
+            _mcProcess.BeginErrorReadLine();
+            _mcInput = _mcProcess.StandardInput;
+
+            //_mcInput = _mcProcess.StandardInput;
+        }
+
+        private void HandleServerOutput(string data)
+        {
+            // Process output from server
+        }
+
+        private void HandleServerError(string error)
+        {
+            // Handle errors
         }
     }
 
