@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using ModelContextProtocol.Protocol.Transport;
 using OpenCursor.Host.LlmClient;
 using System.Diagnostics;
 using System.IO;
@@ -81,7 +82,16 @@ namespace OpenCursor.Host
         {
             // Register WPF windows
             services.AddSingleton<MainWindow>();
-            services.AddSingleton<StreamTransport>();
+            services.AddSingleton<IClientTransport>( factory =>
+            {
+                // Connect the MCP Server to the transport using Stdio
+                var clientTransport = new StdioClientTransport(new StdioClientTransportOptions()
+                {
+                    Command = "OpenCursor.MCPClient.exe", // or full path
+                    Name = "OpenCursor.MCPClient"
+                });
+                return clientTransport;
+            });
             services.AddSingleton<GeminiChatClient>();
 
             services.AddChatClient(factory =>
@@ -93,57 +103,58 @@ namespace OpenCursor.Host
                 return client;
             });
 
-            // Now connect the MCP client to the ChatClient
-            // _mcInput is input to MCP server
+            
+
 
         }
 
-        private void StartMcpServer()
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "OpenCursor.MCPServer.exe", // or full path
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
+        // AI generated crap
+        //private void StartMcpServer()
+        //{
+        //    var startInfo = new ProcessStartInfo
+        //    {
+        //        FileName = "OpenCursor.MCPServer.exe", // or full path
+        //        UseShellExecute = false,
+        //        CreateNoWindow = true,
+        //        RedirectStandardInput = true,
+        //        RedirectStandardOutput = true,
+        //        RedirectStandardError = true
+        //    };
 
-            _mcProcess = new Process { StartInfo = startInfo };
-            _mcProcess.EnableRaisingEvents = true;
+        //    _mcProcess = new Process { StartInfo = startInfo };
+        //    _mcProcess.EnableRaisingEvents = true;
 
-            // Handle output
-            _mcProcess.OutputDataReceived += (sender, args) => {
-                if (!string.IsNullOrEmpty(args.Data))
-                    Dispatcher.Invoke(() => HandleServerOutput(args.Data));
-            };
+        //    // Handle output
+        //    _mcProcess.OutputDataReceived += (sender, args) => {
+        //        if (!string.IsNullOrEmpty(args.Data))
+        //            Dispatcher.Invoke(() => HandleServerOutput(args.Data));
+        //    };
 
-            // Handle errors
-            _mcProcess.ErrorDataReceived += (sender, args) => {
-                if (!string.IsNullOrEmpty(args.Data))
-                    Dispatcher.Invoke(() => HandleServerError(args.Data));
-            };
+        //    // Handle errors
+        //    _mcProcess.ErrorDataReceived += (sender, args) => {
+        //        if (!string.IsNullOrEmpty(args.Data))
+        //            Dispatcher.Invoke(() => HandleServerError(args.Data));
+        //    };
 
-            _mcProcess.Start();
+        //    _mcProcess.Start();
 
-            // Set up async output reading
-            _mcProcess.BeginOutputReadLine();
-            _mcProcess.BeginErrorReadLine();
-            _mcInput = _mcProcess.StandardInput;
+        //    // Set up async output reading
+        //    _mcProcess.BeginOutputReadLine();
+        //    _mcProcess.BeginErrorReadLine();
+        //    _mcInput = _mcProcess.StandardInput;
 
-            //_mcInput = _mcProcess.StandardInput;
-        }
+        //    //_mcInput = _mcProcess.StandardInput;
+        //}
 
-        private void HandleServerOutput(string data)
-        {
-            // Process output from server
-        }
+        //private void HandleServerOutput(string data)
+        //{
+        //    // Process output from server
+        //}
 
-        private void HandleServerError(string error)
-        {
-            // Handle errors
-        }
+        //private void HandleServerError(string error)
+        //{
+        //    // Handle errors
+        //}
     }
 
 }
