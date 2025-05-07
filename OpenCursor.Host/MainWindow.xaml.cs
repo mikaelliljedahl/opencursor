@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.ObjectModel;
 using System.Windows;
 
@@ -6,15 +7,18 @@ namespace OpenCursor.Host
 {
     public partial class MainWindow : Window
     {
+        private readonly IServiceProvider _serviceProvider;
+
         // --- State --- 
         private readonly ObservableCollection<string> _chatHistory; // For display
-        private readonly IChatClient _chatClient; // For LLM calls
+        private IChatClient _chatClient; // For LLM calls
 
-        public MainWindow(IChatClient chatClient) 
+        public MainWindow(IServiceProvider serviceProvider) // IChatClient chatClient
         {   
             InitializeComponent();
+            _serviceProvider = serviceProvider;
             _chatHistory = new ObservableCollection<string>();
-            _chatClient = chatClient;
+            //_chatClient = chatClient;
             ChatHistoryDisplay.ItemsSource = _chatHistory;
 
            
@@ -51,6 +55,12 @@ namespace OpenCursor.Host
             UserInputTextBox.Clear();
 
             SendButton.IsEnabled = false; // Disable button during API call
+
+            if (_chatClient == null)
+            {
+                // Program hans if we add it to contructor
+                _chatClient = _serviceProvider.GetRequiredService<IChatClient>();
+            }
 
             try
             {
