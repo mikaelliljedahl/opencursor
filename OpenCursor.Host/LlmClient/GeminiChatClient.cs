@@ -211,7 +211,7 @@ public class GeminiChatClient : IChatClient
             .Select(m => new GeminiContent
         {
             Role = m.Role.ToString().ToLower(), // Convert ChatRole to lowercase string for Gemini
-            Parts = new List<GeminiPart> { new GeminiPart { Text = m.Contents.ToString() } }
+            Parts = new List<GeminiPart> { new GeminiPart { Text = string.Join("", m.Contents.Select(c=>c.ToString())) } }
         }).ToList();
 
         // 2. Add actual conversation history (from the argument)
