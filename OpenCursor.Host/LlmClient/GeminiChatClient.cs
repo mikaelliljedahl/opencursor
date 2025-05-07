@@ -24,7 +24,7 @@ public class GeminiChatClient : IChatClient
     private readonly string _geminiModelName = "gemini-2.0-flash"; //  gemini-pro";
     private const string GeminiApiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models/";
     private string SystemPromptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SystemPrompt", "systemprompt.md"); // Assuming it's copied to output
-    private List<GeminiContent> _conversationHistory; // For API context (using Gemini structure)
+    private List<GeminiContent> _conversationHistory = new List<GeminiContent>(); // For API context (using Gemini structure)
 
     public GeminiChatClient(IConfiguration configuration, MainWindow mainWindow)
     {

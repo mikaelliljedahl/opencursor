@@ -22,6 +22,9 @@
 
 
   <ItemGroup>
+    <None Update="appsettings.Development.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="SystemPrompt\systemprompt.md">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

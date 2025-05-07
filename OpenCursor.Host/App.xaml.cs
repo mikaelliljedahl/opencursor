@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ModelContextProtocol.Protocol.Transport;
@@ -57,25 +58,30 @@ namespace OpenCursor.Host
 
             base.OnExit(e);
         }
-
+  
         private static IHostBuilder CreateHostBuilder()
         {
-
             var builder = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder()
+                .ConfigureAppConfiguration((hostingContext, config) =>
+                {
+                    // This automatically loads:
+                    // - appsettings.json
+                    // - appsettings.{Environment}.json
+                    // - Environment variables
+                    // - Command line arguments
+                    config.SetBasePath(Directory.GetCurrentDirectory());
+
+                    var env = hostingContext.HostingEnvironment;
+                    config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                          .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true, reloadOnChange: true);
+                })
                 .ConfigureServices((hostContext, services) =>
                 {
                     // Register your services here
                     ConfigureServices(services);
                 });
 
-            //var mcpService = builder.AddConnectionString("OpenCursorMCPServerConnectionName");
-
-            //var mcpServer = builder.AddProject<OpenCursor_MCPServer>("OpenCursorMCPServer")
-            //    .WithReference(mcpService);
-
-
             return builder;
-
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -102,9 +108,6 @@ namespace OpenCursor.Host
                 .Build();
                 return client;
             });
-
-            
-
 
         }
 
