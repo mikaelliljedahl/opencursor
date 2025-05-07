@@ -10,11 +10,11 @@ namespace OpenCursor.Host
         private readonly ObservableCollection<string> _chatHistory; // For display
         private readonly IChatClient _chatClient; // For LLM calls
 
-        public MainWindow() // IChatClient chatClient
+        public MainWindow(IChatClient chatClient) 
         {   
             InitializeComponent();
             _chatHistory = new ObservableCollection<string>();
-            //_chatClient = chatClient;
+            _chatClient = chatClient;
             ChatHistoryDisplay.ItemsSource = _chatHistory;
 
            
@@ -54,7 +54,8 @@ namespace OpenCursor.Host
 
             try
             {
-                
+                var response = await _chatClient.GetResponseAsync(userInput);
+                AddChatMessage(response.Text);
             }
             catch (Exception ex)
             {

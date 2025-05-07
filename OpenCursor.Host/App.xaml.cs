@@ -35,7 +35,7 @@ namespace OpenCursor.Host
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
             mainWindow.Show();
 
-            StartMcpServer();
+            //StartMcpServer();
             base.OnStartup(e);
         }
 
