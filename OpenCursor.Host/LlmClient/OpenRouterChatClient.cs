@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using OpenAI;
 using System.ClientModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace OpenCursor.Host.LlmClient
@@ -12,6 +13,7 @@ namespace OpenCursor.Host.LlmClient
         private OpenAI.Chat.ChatClient _openAIClient;
         string model = "qwen/qwen3-235b-a22b";
         string othermodel = "qwen/qwen3-30b-a3b:free";
+        string mistralmodel = "mistralai/mistral-small-3.1-24b-instruct:free";
 
         //private readonly HttpClient _httpClient;
 
@@ -73,26 +75,72 @@ namespace OpenCursor.Host.LlmClient
                 },
                 cancellationToken);
 
-            ChatRole role = ChatRole.Assistant;
-            if (result.Value.Role == OpenAI.Chat.ChatMessageRole.Function)
-                role = ChatRole.Tool;
 
-            if (result.Value.Role == OpenAI.Chat.ChatMessageRole.User)
-                role = ChatRole.User;
+            var message = result.Value;
 
+            var response = new ChatResponse();
 
-            // Map the response to ChatResponse
-            return new ChatResponse()
+            var responseText = message.Content.FirstOrDefault()?.Text ?? string.Empty;
+            var toolCall = ToolCallExtractor.TryExtractToolCall(responseText);
+
+            if (message.ToolCalls?.Count > 0)
             {
-                Messages = result.Value.Content.Select(m =>
-                    new ChatMessage()
+                response.Messages = message.ToolCalls.Select(tc =>
+                    new ChatMessage
                     {
-                        Role = role,
+                        Role = ChatRole.Tool,
+                        Contents = [new FunctionCallContent(message.Id, tc.FunctionName, new Dictionary<string, object>()  )]
+                    }).ToList();
+                
+                response.FinishReason = ChatFinishReason.ToolCalls;
+                return response;
+            }
+            else if (toolCall != null && !string.IsNullOrWhiteSpace(toolCall.tool))
+            {
+                response.Messages = [
+
+                    new ChatMessage
+                    {
+                        Role = ChatRole.Tool,
+                        Contents = [new FunctionCallContent(message.Id, toolCall.tool, toolCall.parameters)]
+                    } ];
+
+                response.FinishReason = ChatFinishReason.ToolCalls; 
+                return response;
+            }
+            else
+            {
+                response.Messages = message.Content.Select(m =>
+                    new ChatMessage
+                    {
+                        Role = ChatRole.Assistant,
                         Contents = [new TextContent(m.Text)]
+                    }).ToList();
+
+                response.FinishReason = ChatFinishReason.Stop;
+                return response;
+            }
+
+            //ChatRole role = ChatRole.Assistant;
+            //if (result.Value.Role == OpenAI.Chat.ChatMessageRole.Function)
+            //    role = ChatRole.Tool;
+
+            //if (result.Value.Role == OpenAI.Chat.ChatMessageRole.User)
+            //    role = ChatRole.User;
+
+
+            //// Map the response to ChatResponse
+            //return new ChatResponse()
+            //{
+            //    Messages = result.Value.Content.Select(m =>
+            //        new ChatMessage()
+            //        {
+            //            Role = role,
+            //            Contents = [new TextContent(m.Text)]
                         
-                    }).ToList(),
-                FinishReason = result.Value.FinishReason == OpenAI.Chat.ChatFinishReason.ToolCalls ? ChatFinishReason.ToolCalls : ChatFinishReason.Stop // ignore other reasons
-            };
+            //        }).ToList(),
+            //    FinishReason = result.Value.FinishReason == OpenAI.Chat.ChatFinishReason.ToolCalls ? ChatFinishReason.ToolCalls : ChatFinishReason.Stop // ignore other reasons
+            //};
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null)

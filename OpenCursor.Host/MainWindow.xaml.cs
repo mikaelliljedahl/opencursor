@@ -99,11 +99,10 @@ public partial class MainWindow : Window
                 new ChatOptions()
                 {
                     Tools = [.. _tools],
-                    ToolMode = ChatToolMode.Auto,
+                    ToolMode = ChatToolMode.RequireAny,
                     AllowMultipleToolCalls = true,
                     Temperature = (float?)0.8,
-                    ResponseFormat = ChatResponseFormat.Json,
-
+                    ResponseFormat = ChatResponseFormat.Json
 
                 });
             AddChatMessage(response.Text);
@@ -121,83 +120,6 @@ public partial class MainWindow : Window
     }
 
 
-    // Helper method to extract tool calls from various JSON structures
-    private bool TryGetToolCalls(JsonElement root, out List<(string ToolName, string Arguments)> toolCalls)
-    {
-        toolCalls = new List<(string, string)>();
-
-        // Check for tool_calls array
-        if (root.TryGetProperty("tool_calls", out var toolCallsArray) && toolCallsArray.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var toolCall in toolCallsArray.EnumerateArray())
-            {
-                if (ExtractToolCall(toolCall, out var name, out var args))
-                {
-                    toolCalls.Add((name, args));
-                }
-            }
-            return toolCalls.Count > 0;
-        }
-
-        // Check for single tool_call
-        if (root.TryGetProperty("tool_call", out var singleToolCall))
-        {
-            if (ExtractToolCall(singleToolCall, out var name, out var args))
-            {
-                toolCalls.Add((name, args));
-                return true;
-            }
-        }
-
-        // Check for function_call
-        if (root.TryGetProperty("function_call", out var functionCall))
-        {
-            if (ExtractToolCall(functionCall, out var name, out var args))
-            {
-                toolCalls.Add((name, args));
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    // Helper method to extract a single tool call from a JSON element
-    private bool ExtractToolCall(JsonElement element, out string name, out string arguments)
-    {
-        name = null;
-        arguments = null;
-
-        // Try to get the name
-        if (element.TryGetProperty("name", out var nameElement))
-        {
-            name = nameElement.GetString();
-        }
-        else if (element.TryGetProperty("function", out var functionElement) &&
-                 functionElement.TryGetProperty("name", out nameElement))
-        {
-            name = nameElement.GetString();
-        }
-
-        // Try to get the arguments
-        if (element.TryGetProperty("arguments", out var argsElement))
-        {
-            if (argsElement.ValueKind == JsonValueKind.String)
-            {
-                arguments = argsElement.GetString();
-            }
-            else
-            {
-                arguments = argsElement.GetRawText();
-            }
-        }
-        else if (element.TryGetProperty("parameters", out argsElement))
-        {
-            arguments = argsElement.GetRawText();
-        }
-
-        return !string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(arguments);
-    }
 
     private string SystemPromptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SystemPrompt", "systemprompt.md"); // Assuming it's copied to output
     private IClientTransport _clientTransport;
@@ -220,7 +142,7 @@ public partial class MainWindow : Window
             sb.Append(systemprompt);
 
             // now add tools
-            // Here are the functions/tools available in JSONSchema format:
+            sb.AppendLine("Here are the functions/tools available in JSONSchema format, please call them using the role: \"tool\" and not \"assistant\" and always use json:");
 
             foreach (var tool in _tools)
             {
