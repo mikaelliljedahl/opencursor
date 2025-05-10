@@ -3,13 +3,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ModelContextProtocol;
-using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
 
 using ModelContextProtocol.Protocol.Transport;
-using Mscc.GenerativeAI.Microsoft;
 using OpenCursor.Host.LlmClient;
+using Serilog;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -96,13 +93,24 @@ namespace OpenCursor.Host
 
         private static void ConfigureServices(IServiceCollection services)
         {
-            // Configure logging
-            services.AddLogging(configure =>
+
+            if (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development")
             {
-                configure.AddDebug(); // This sends logs to the debug output window
-                configure.AddConsole(); // This sends logs to the console output
-                configure.SetMinimumLevel(LogLevel.Debug); // Set the minimum log level
-            });
+                Log.Logger = new LoggerConfiguration()
+                    .MinimumLevel.Debug()
+                    .WriteTo.Console(standardErrorFromLevel: Serilog.Events.LogEventLevel.Debug)
+                    .WriteTo.File("logs/hostlog.txt", rollingInterval: RollingInterval.Day, restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Debug)
+                    .CreateLogger();
+
+                // Configure logging
+                services.AddLogging(configure =>
+                {
+                    configure.AddDebug(); // This sends logs to the debug output window
+                    configure.AddConsole(); // This sends logs to the console output
+                    configure.SetMinimumLevel(LogLevel.Debug); // Set the minimum log level
+                    configure.AddSerilog();
+                });
+            }
 
             // Register WPF windows
             services.AddSingleton<MainWindow>();
@@ -116,10 +124,7 @@ namespace OpenCursor.Host
                 });
                 return clientTransport;
             });
-            // Register server tools with proper assembly reference
-            // Register server tools from the correct assembly
-            services.AddMcpServer().WithToolsFromAssembly(typeof(OpenCursor.MCPServer.MCPServer).Assembly);
-            
+           
             // Register chat client with function invocation support
             services.AddSingleton<WrappedGeminiChatClient>();
 
