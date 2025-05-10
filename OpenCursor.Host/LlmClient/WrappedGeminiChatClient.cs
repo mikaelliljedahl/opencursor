@@ -17,7 +17,6 @@ public class WrappedGeminiChatClient : IChatClient
     private readonly MainWindow _mainWindow;
     private readonly string _geminiModelName = "gemini-2.0-flash"; //  gemini-pro";
     private const string GeminiApiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models/";
-    private string SystemPromptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SystemPrompt", "systemprompt.md"); // Assuming it's copied to output
     //private List<GeminiContent> _conversationHistory = new List<GeminiContent>(); // For API context (using Gemini structure)
     /// <summary>
     /// Gets the Gemini model that is used to communicate with.
@@ -169,26 +168,6 @@ public class WrappedGeminiChatClient : IChatClient
 
     }
 
-
-    private string LoadSystemPrompt() // Renamed from BuildSystemPrompt for clarity
-    {
-        try
-        {
-            if (!File.Exists(SystemPromptFilePath))
-            {
-                throw new FileNotFoundException("System prompt file not found.", SystemPromptFilePath);
-            }
-            return File.ReadAllText(SystemPromptFilePath).Trim();
-        }
-        catch (Exception ex)
-        {
-            string errorMsg = $"SYSTEM: WARNING! Could not load system prompt from {SystemPromptFilePath}. Error: {ex.Message}";
-            Console.WriteLine(errorMsg);
-            _mainWindow.AddChatMessage(errorMsg);
-            // Return a default minimal prompt
-            return "You are a helpful assistant. Format commands using XML tags like <create_file path='...'>content</create_file>.";
-        }
-    }
 
 
     //// Helper to prepare the payload for Gemini API
