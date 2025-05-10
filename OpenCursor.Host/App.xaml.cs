@@ -3,6 +3,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol;
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
+
 using ModelContextProtocol.Protocol.Transport;
 using Mscc.GenerativeAI.Microsoft;
 using OpenCursor.Host.LlmClient;
@@ -26,6 +30,7 @@ namespace OpenCursor.Host
         {
            
             _host = CreateHostBuilder().Build();
+            
         }
 
         public static IServiceProvider Services => ((App)Current)._host.Services;
@@ -37,6 +42,9 @@ namespace OpenCursor.Host
             // Get the main window from the service provider
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
             mainWindow.Show();
+
+            
+
 
             //StartMcpServer();
             base.OnStartup(e);
@@ -100,14 +108,19 @@ namespace OpenCursor.Host
             services.AddSingleton<MainWindow>();
             services.AddSingleton<IClientTransport>( factory =>
             {
-                // Connect the MCP Server to the transport using Stdio
+                // Connect to the MCP Server process
                 var clientTransport = new StdioClientTransport(new StdioClientTransportOptions()
                 {
-                    Command = "OpenCursor.MCPClient.exe", // or full path
-                    Name = "OpenCursor.MCPClient"
+                    Command = "OpenCursor.MCPServer.exe", // Must match server's executable name
+                    Name = "OpenCursor.MCPServer"
                 });
                 return clientTransport;
             });
+            // Register server tools with proper assembly reference
+            // Register server tools from the correct assembly
+            services.AddMcpServer().WithToolsFromAssembly(typeof(OpenCursor.MCPServer.MCPServer).Assembly);
+            
+            // Register chat client with function invocation support
             services.AddSingleton<WrappedGeminiChatClient>();
 
             services.AddChatClient(factory =>
