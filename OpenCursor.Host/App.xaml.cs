@@ -2,7 +2,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol.Transport;
+using Mscc.GenerativeAI.Microsoft;
 using OpenCursor.Host.LlmClient;
 using System.Diagnostics;
 using System.IO;
@@ -86,6 +88,14 @@ namespace OpenCursor.Host
 
         private static void ConfigureServices(IServiceCollection services)
         {
+            // Configure logging
+            services.AddLogging(configure =>
+            {
+                configure.AddDebug(); // This sends logs to the debug output window
+                configure.AddConsole(); // This sends logs to the console output
+                configure.SetMinimumLevel(LogLevel.Debug); // Set the minimum log level
+            });
+
             // Register WPF windows
             services.AddSingleton<MainWindow>();
             services.AddSingleton<IClientTransport>( factory =>
@@ -98,11 +108,11 @@ namespace OpenCursor.Host
                 });
                 return clientTransport;
             });
-            services.AddSingleton<GeminiChatClient>();
+            services.AddSingleton<WrappedGeminiChatClient>();
 
             services.AddChatClient(factory =>
             {
-                var client = factory.GetRequiredService<GeminiChatClient>(); // Can easilly be replaced with a different client
+                var client = factory.GetRequiredService<WrappedGeminiChatClient>(); // Can easilly be replaced with a different client
                 client.AsBuilder()
                 .UseFunctionInvocation() // magic that makes the client call functions
                 .Build();
