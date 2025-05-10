@@ -1,45 +1,27 @@
 ﻿using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using OpenAI;
-using System;
 using System.ClientModel;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace OpenCursor.Host.LlmClient
 {
     public class OpenRouterChatClient : IChatClient
     {
-        private IChatClient _chatClient;
+        //private IChatClient _chatClient;
+        private OpenAI.Chat.ChatClient _openAIClient;
+        string model = "qwen/qwen3-235b-a22b";
+        string othermodel = "qwen/qwen3-30b-a3b:free";
+
         //private readonly HttpClient _httpClient;
 
 
         public OpenRouterChatClient(IConfiguration configuration) 
         {
             var apiKey = configuration.GetValue<string>("OpenRouterApiKey");
-            // Configure HttpClient with OpenRouter headers
-            //_httpClient = new HttpClient();
-            //_httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-            
+           
 
-            //// Create OpenAIClient with custom HttpClient
-            //var openAIClient1 = new OpenAIClient(new ApiKeyCredential(apiKey),
-            //    new OpenAIClientOptions
-            //    {
-            //        Endpoint = new Uri("https://openrouter.ai/api/v1"),
-
-            //        Transport = new 
-            //    },
-            //    new Uri("https://openrouter.ai/api/v1"),
-            //    _httpClient
-            //);
-
-
-            var openAIClient = new OpenAI.Chat.ChatClient("qwen/qwen3-235b-a22b", credential: new ApiKeyCredential(apiKey), 
+            _openAIClient = new OpenAI.Chat.ChatClient(model, credential: new ApiKeyCredential(apiKey), 
                 options: new OpenAIClientOptions()
             {
                     Endpoint = new Uri("https://openrouter.ai/api/v1"),
@@ -47,22 +29,76 @@ namespace OpenCursor.Host.LlmClient
                     
                 });
 
-
-            _chatClient = openAIClient.AsIChatClient();   
         }
 
         public void Dispose()
         {
         }
 
-        public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+
+        public async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
         {
-            return await _chatClient.GetResponseAsync(messages, options, cancellationToken);
+            // Convert Microsoft.Extensions.AI.ChatMessage to OpenAI.Chat.ChatMessage, we need a switch statement to create the correct type of chatmessage, e.g. User/assistant/tool
+            var openAIMessages = messages.Select<ChatMessage, OpenAI.Chat.ChatMessage>(m =>
+{
+                    // Assuming Microsoft.Extensions.AI.ChatMessage has properties: Role, Contents
+                    // Map roles to OpenAI.Chat.ChatRole
+                    switch (m.Role.ToString().ToLowerInvariant())
+                    {
+                        case "user":
+                            return OpenAI.Chat.ChatMessage.CreateUserMessage(m.Text);
+                        case "assistant":
+                            return OpenAI.Chat.ChatMessage.CreateAssistantMessage(m.Text);
+                        case "system":
+                            return OpenAI.Chat.ChatMessage.CreateSystemMessage(m.Text);
+                        case "function":
+                            return OpenAI.Chat.ChatMessage.CreateSystemMessage(m.Text);
+                        case "tool":
+                            return OpenAI.Chat.ChatMessage.CreateToolMessage(m.Text);
+                        default:
+                            // Fallback to user if unknown
+                            return OpenAI.Chat.ChatMessage.CreateUserMessage(m.Text);
+                    }
+                }).ToList();
+
+            // Call OpenRouter's API through the OpenAI client
+            var result = await _openAIClient.CompleteChatAsync(
+                openAIMessages,
+                new OpenAI.Chat.ChatCompletionOptions()
+                {
+                    Temperature = options?.Temperature ?? 0.7f
+                },
+                cancellationToken);
+
+            ChatRole role = ChatRole.Assistant;
+            if (result.Value.Role == OpenAI.Chat.ChatMessageRole.Function)
+                role = ChatRole.Tool;
+
+            if (result.Value.Role == OpenAI.Chat.ChatMessageRole.User)
+                role = ChatRole.User;
+
+
+            // Map the response to ChatResponse
+            return new ChatResponse()
+            {
+                Messages = result.Value.Content.Select(m =>
+                    new ChatMessage()
+                    {
+                        Role = role,
+                        Contents = [new TextContent(m.Text)]
+                        
+                    }).ToList(),
+                FinishReason = result.Value.FinishReason == OpenAI.Chat.ChatFinishReason.ToolCalls ? ChatFinishReason.ToolCalls : ChatFinishReason.Stop // ignore other reasons
+            };
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null)
         {
-            return _chatClient.GetService(serviceType, serviceKey);
+
+            return _openAIClient.AsIChatClient().GetService(serviceType, serviceKey);
         }
 
        
@@ -72,8 +108,10 @@ namespace OpenCursor.Host.LlmClient
     ChatOptions? options = null,
     [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
+            var chatClient = _openAIClient.AsIChatClient();
+
             // Forward the streaming response from the wrapped client
-            await foreach (var update in _chatClient.GetStreamingResponseAsync(messages, options, cancellationToken)
+            await foreach (var update in chatClient.GetStreamingResponseAsync(messages, options, cancellationToken)
                 .WithCancellation(cancellationToken))
             {
                 yield return update;

@@ -127,14 +127,14 @@ namespace OpenCursor.Host
            
             // Register chat client with function invocation support
             services.AddSingleton<WrappedGeminiChatClient>();
+            services.AddSingleton<OpenRouterChatClient>();
 
             services.AddChatClient(factory =>
             {
-                var client = factory.GetRequiredService<WrappedGeminiChatClient>(); // Can easilly be replaced with a different client
-                client.AsBuilder()
+                var client = factory.GetRequiredService<OpenRouterChatClient>(); // Can easilly be replaced with a different client
+                return client.AsBuilder()
                 .UseFunctionInvocation() // magic that makes the client call functions
                 .Build();
-                return client;
             });
 
         }

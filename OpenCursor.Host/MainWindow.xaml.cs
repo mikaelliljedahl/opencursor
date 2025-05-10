@@ -2,15 +2,12 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol.Transport;
-using System;
-using System.Collections.ObjectModel;
-using System.Windows;
 using ModelContextProtocol.Protocol.Types;
-using Microsoft.Extensions.Logging;
-using Mscc.GenerativeAI;
+using System.Collections.ObjectModel;
 using System.IO;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.Text;
+using System.Text.Json;
+using System.Windows;
 
 namespace OpenCursor.Host;
 
@@ -42,14 +39,14 @@ public partial class MainWindow : Window
         // Create a sampling client.
         _samplingClient = _serviceProvider.GetRequiredService<IChatClient>();
 
-
-        var mcpClient = await McpClientFactory.CreateAsync(_clientTransport, clientOptions: new()
+        
+        _mcpClient = await McpClientFactory.CreateAsync(_clientTransport, clientOptions: new()
         {
             Capabilities = new ClientCapabilities() { Sampling = new() { SamplingHandler = _samplingClient.CreateSamplingHandler() } },
         });
 
 
-        _tools = await mcpClient.ListToolsAsync();
+        _tools = await _mcpClient.ListToolsAsync();
         AddChatMessage($"Tools available:");
 
         foreach (var tool in _tools)
@@ -82,7 +79,7 @@ public partial class MainWindow : Window
     {   
         string userInput = UserInputTextBox.Text.Trim();
        
-        // Add user message to UI and internal history (Gemini format)
+        // Add user message to UI and internal history
         AddChatMessage($"User: {userInput}");
         UserInputTextBox.Clear();
 
@@ -96,9 +93,9 @@ public partial class MainWindow : Window
 
         try
         {
-            messages.Add(new (ChatRole.User, userInput));
-            List<ChatResponseUpdate> updates = [];
-            await foreach (var response in _chatClient.GetStreamingResponseAsync(messages,
+            messages.Add(new(ChatRole.User, userInput));
+
+            var response = await _chatClient.GetResponseAsync(messages,
                 new ChatOptions()
                 {
                     Tools = [.. _tools],
@@ -106,13 +103,12 @@ public partial class MainWindow : Window
                     AllowMultipleToolCalls = true,
                     Temperature = (float?)0.8,
                     ResponseFormat = ChatResponseFormat.Json,
-                    
 
-                }))
-            {
-                updates.Add(response);
-                AddChatMessage(response.Text);
-            }
+
+                });
+            AddChatMessage(response.Text);
+
+
         }
         catch (Exception ex)
         {
@@ -120,13 +116,93 @@ public partial class MainWindow : Window
         }
         finally
         {
-             Dispatcher.Invoke(() => SendButton.IsEnabled = true); // Re-enable button
+            Dispatcher.Invoke(() => SendButton.IsEnabled = true); // Re-enable button
         }
+    }
+
+
+    // Helper method to extract tool calls from various JSON structures
+    private bool TryGetToolCalls(JsonElement root, out List<(string ToolName, string Arguments)> toolCalls)
+    {
+        toolCalls = new List<(string, string)>();
+
+        // Check for tool_calls array
+        if (root.TryGetProperty("tool_calls", out var toolCallsArray) && toolCallsArray.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var toolCall in toolCallsArray.EnumerateArray())
+            {
+                if (ExtractToolCall(toolCall, out var name, out var args))
+                {
+                    toolCalls.Add((name, args));
+                }
+            }
+            return toolCalls.Count > 0;
+        }
+
+        // Check for single tool_call
+        if (root.TryGetProperty("tool_call", out var singleToolCall))
+        {
+            if (ExtractToolCall(singleToolCall, out var name, out var args))
+            {
+                toolCalls.Add((name, args));
+                return true;
+            }
+        }
+
+        // Check for function_call
+        if (root.TryGetProperty("function_call", out var functionCall))
+        {
+            if (ExtractToolCall(functionCall, out var name, out var args))
+            {
+                toolCalls.Add((name, args));
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Helper method to extract a single tool call from a JSON element
+    private bool ExtractToolCall(JsonElement element, out string name, out string arguments)
+    {
+        name = null;
+        arguments = null;
+
+        // Try to get the name
+        if (element.TryGetProperty("name", out var nameElement))
+        {
+            name = nameElement.GetString();
+        }
+        else if (element.TryGetProperty("function", out var functionElement) &&
+                 functionElement.TryGetProperty("name", out nameElement))
+        {
+            name = nameElement.GetString();
+        }
+
+        // Try to get the arguments
+        if (element.TryGetProperty("arguments", out var argsElement))
+        {
+            if (argsElement.ValueKind == JsonValueKind.String)
+            {
+                arguments = argsElement.GetString();
+            }
+            else
+            {
+                arguments = argsElement.GetRawText();
+            }
+        }
+        else if (element.TryGetProperty("parameters", out argsElement))
+        {
+            arguments = argsElement.GetRawText();
+        }
+
+        return !string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(arguments);
     }
 
     private string SystemPromptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SystemPrompt", "systemprompt.md"); // Assuming it's copied to output
     private IClientTransport _clientTransport;
     private IChatClient _samplingClient;
+    private IMcpClient _mcpClient;
     private IList<McpClientTool> _tools;
 
     private string BuildSystemPrompt() 

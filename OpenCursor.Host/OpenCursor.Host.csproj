@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="9.4.4-preview.1.25259.16" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.4" />
     <!--<PackageReference Include="Microsoft.SemanticKernel.Connectors.Google" Version="1.48.0-alpha" />-->
