@@ -1,0 +1,160 @@
+@page "/"
+@inject IServiceProvider ServiceProvider
+@inject Microsoft.Extensions.AI.IChatClient ChatClient // Inject the configured chat client
+@inject ModelContextProtocol.Protocol.Transport.IClientTransport ClientTransport // Inject the client transport
+@using ModelContextProtocol.Client
+@using ModelContextProtocol.Protocol.Types
+@using System.Text
+@using System.IO
+@using Microsoft.Extensions.AI
+
+<PageTitle>Index</PageTitle>
+
+<h1>OpenCursor Host</h1>
+
+<div class="chat-container">
+    <div class="chat-history">
+        @foreach (var message in _chatHistory)
+        {
+            <p>@message</p>
+        }
+    </div>
+    <div class="chat-input">
+        <input @bind="_userInput" @onkeydown="HandleInput" placeholder="Enter message..." />
+        <button @onclick="SendMessage" disabled="@_isSending">Send</button>
+    </div>
+</div>
+
+
+@code {
+    // --- State ---
+    private List<string> _chatHistory = new List<string>(); // For display
+    private string _userInput;
+    private bool _isSending = false;
+
+    // LLM related state
+    private List<Microsoft.Extensions.AI.ChatMessage> messages = new List<Microsoft.Extensions.AI.ChatMessage>(); // chathistory for the LLM
+    private IMcpClient _mcpClient;
+    private IList<McpClientTool> _tools;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize MCP Client and load tools
+        // _mcpClient = await McpClientFactory.CreateAsync(ClientTransport, clientOptions: new()
+        // {
+        //     Capabilities = new ClientCapabilities() { Sampling = new() { SamplingHandler = ChatClient.CreateSamplingHandler() } },
+        // });
+
+        // _tools = await _mcpClient.ListToolsAsync();
+        // AddChatMessage($"Tools available:");
+
+        // foreach (var tool in _tools)
+        // {
+        //     AddChatMessage($" {tool.Name}"); // Display tool name instead of full object
+        // }
+
+        _tools = new List<McpClientTool>();
+
+        var systemPrompt = BuildSystemPrompt();
+        messages.Add(new(ChatRole.System, systemPrompt));
+    }
+
+    // --- Chat Logic ---
+    public void AddChatMessage(string message)
+    {
+        _chatHistory.Add(message);
+        // Blazor automatically updates the UI when state changes, no Dispatcher.Invoke needed
+        StateHasChanged();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_userInput) || _isSending)
+        {
+            return;
+        }
+
+        string userInput = _userInput.Trim();
+
+        // Add user message to UI and internal history
+        AddChatMessage($"User: {userInput}");
+        _userInput = string.Empty; // Clear input
+        _isSending = true; // Disable button during API call
+        StateHasChanged(); // Update UI to show message and disable button
+
+        try
+        {
+            messages.Add(new(ChatRole.User, userInput));
+
+            var response = await ChatClient.GetResponseAsync(messages,
+                new ChatOptions()
+                {
+                    Tools = [.. _tools],
+                    ToolMode = ChatToolMode.RequireAny,
+                    AllowMultipleToolCalls = true,
+                    Temperature = (float?)0.8,
+                    ResponseFormat = ChatResponseFormat.Json
+                });
+
+            AddChatMessage($"LLM: {response.Text}"); // Add LLM response to UI
+        }
+        catch (Exception ex)
+        {
+            AddChatMessage($"SYSTEM: Error during API call: {ex.Message}");
+        }
+        finally
+        {
+            _isSending = false; // Re-enable button
+            StateHasChanged(); // Update UI to re-enable button
+        }
+    }
+
+    private async Task HandleInput(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
+
+    private string SystemPromptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SystemPrompt", "systemprompt.md"); // Assuming it's copied to output
+
+    private string BuildSystemPrompt()
+    {
+        try
+        {
+            if (!File.Exists(SystemPromptFilePath))
+            {
+                throw new FileNotFoundException("System prompt file not found.", SystemPromptFilePath);
+            }
+
+            var sb = new StringBuilder();
+
+            var systemprompt = File.ReadAllText(SystemPromptFilePath).Trim();
+            sb.Append(systemprompt);
+
+            // now add tools
+            sb.AppendLine("Here are the functions/tools available in JSONSchema format, please call them using the role: \"tool\" and not \"assistant\" and always use json:");
+
+            if (_tools != null)
+            {
+                foreach (var tool in _tools)
+                {
+                    sb.AppendLine($"{tool.JsonSchema}");
+                }
+            }
+
+
+            return sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            string errorMsg = $"SYSTEM: WARNING! Could not load system prompt from {SystemPromptFilePath}. Error: {ex.Message}";
+            Console.WriteLine(errorMsg);
+            AddChatMessage(errorMsg);
+            // Return a default minimal prompt
+            return "You are a helpful assistant. Format commands using json tags.";
+        }
+    }
+}

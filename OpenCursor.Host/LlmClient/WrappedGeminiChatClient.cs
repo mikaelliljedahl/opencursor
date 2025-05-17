@@ -14,7 +14,6 @@ public class WrappedGeminiChatClient : IChatClient
 {
 
     private readonly string _googleApiKey;
-    private readonly MainWindow _mainWindow;
     private readonly string _geminiModelName = "gemini-2.0-flash"; //  gemini-pro";
     private const string GeminiApiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models/";
     //private List<GeminiContent> _conversationHistory = new List<GeminiContent>(); // For API context (using Gemini structure)
@@ -24,17 +23,17 @@ public class WrappedGeminiChatClient : IChatClient
     private readonly Mscc.GenerativeAI.GenerativeModel _client;
     private readonly ChatClientMetadata _metadata;
 
-    public WrappedGeminiChatClient(IConfiguration configuration, MainWindow mainWindow)
+    public WrappedGeminiChatClient(IConfiguration configuration)
     {
         _googleApiKey = configuration.GetValue<string>("GoogleApiKey");
-        _mainWindow = mainWindow;
 
         var genAi = new Mscc.GenerativeAI.GoogleAI(_googleApiKey);
         _client = genAi.GenerativeModel(_geminiModelName);
 
         if (string.IsNullOrEmpty(_googleApiKey) || _googleApiKey == "YOUR_GOOGLE_API_KEY")
         {
-            _mainWindow.AddChatMessage("SYSTEM: WARNING! Google API Key not configured. Please set _googleApiKey securely.");
+            // In a Blazor app, we might log this or show a UI notification instead of using AddChatMessage
+            Console.WriteLine("SYSTEM: WARNING! Google API Key not configured. Please set _googleApiKey securely.");
         }
     }
 
@@ -147,8 +146,8 @@ public class WrappedGeminiChatClient : IChatClient
     //        builder.Append(word).Append(' ');
 
 
-    //        // Add AI response to UI and internal history
-    //        _mainWindow.AddChatMessage($"AI: {builder.ToString().TrimEnd()}");
+    //        // In a Blazor app, we might log this or show a UI notification instead of using AddChatMessage
+    //        Console.WriteLine($"AI: {builder.ToString().TrimEnd()}");
     //        yield return new ChatResponseUpdate(
     //            ChatRole.Assistant, builder.ToString().TrimEnd());
 
