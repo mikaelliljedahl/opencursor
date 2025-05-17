@@ -10,11 +10,14 @@ var builder = Host.CreateEmptyApplicationBuilder(settings: null);
 //builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
 
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .WriteTo.Console(standardErrorFromLevel: Serilog.Events.LogEventLevel.Information)
+    .MinimumLevel.Debug()
+    .WriteTo.Console(standardErrorFromLevel: Serilog.Events.LogEventLevel.Debug)
+    .WriteTo.File("logs/mcpserverlog.txt", rollingInterval: RollingInterval.Day, restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Debug)
     .CreateLogger();
 
-builder.Logging.ClearProviders();
+builder.Logging.AddDebug();
+builder.Logging.AddConsole();
+builder.Logging.SetMinimumLevel(LogLevel.Debug);
 builder.Logging.AddSerilog();
 
 builder.Services

@@ -1,9 +1,6 @@
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol.Transport;
+using OpenCursor.Host;
 using OpenCursor.Host.LlmClient;
 using Serilog;
 
@@ -52,6 +49,11 @@ builder.Services.AddChatClient(factory =>
     .Build();
 });
 
+//// Register the hosted service to start the MCP server process
+//builder.Services.AddHostedService<McpServerHostedService>();
+
+// Register McpClientService as a singleton
+builder.Services.AddScoped<McpClientService>();
 
 var app = builder.Build();
 

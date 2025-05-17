@@ -1,7 +1,6 @@
 @page "/"
-@inject IServiceProvider ServiceProvider
+@inject McpClientService McpClientService // Inject the singleton service
 @inject Microsoft.Extensions.AI.IChatClient ChatClient // Inject the configured chat client
-@inject ModelContextProtocol.Protocol.Transport.IClientTransport ClientTransport // Inject the client transport
 @using ModelContextProtocol.Client
 @using ModelContextProtocol.Protocol.Types
 @using System.Text
@@ -34,26 +33,21 @@
 
     // LLM related state
     private List<Microsoft.Extensions.AI.ChatMessage> messages = new List<Microsoft.Extensions.AI.ChatMessage>(); // chathistory for the LLM
-    private IMcpClient _mcpClient;
-    private IList<McpClientTool> _tools;
 
     protected override async Task OnInitializedAsync()
     {
-        // Initialize MCP Client and load tools
-        // _mcpClient = await McpClientFactory.CreateAsync(ClientTransport, clientOptions: new()
-        // {
-        //     Capabilities = new ClientCapabilities() { Sampling = new() { SamplingHandler = ChatClient.CreateSamplingHandler() } },
-        // });
+        // Initialize MCP Client via the service
+        await McpClientService.InitializeAsync();
 
-        // _tools = await _mcpClient.ListToolsAsync();
-        // AddChatMessage($"Tools available:");
+        AddChatMessage($"Tools available:");
 
-        // foreach (var tool in _tools)
-        // {
-        //     AddChatMessage($" {tool.Name}"); // Display tool name instead of full object
-        // }
-
-        _tools = new List<McpClientTool>();
+        if (McpClientService.Tools != null)
+        {
+            foreach (var tool in McpClientService.Tools)
+            {
+                AddChatMessage($" {tool.Name}"); // Display tool name instead of full object
+            }
+        }
 
         var systemPrompt = BuildSystemPrompt();
         messages.Add(new(ChatRole.System, systemPrompt));
@@ -89,7 +83,7 @@
             var response = await ChatClient.GetResponseAsync(messages,
                 new ChatOptions()
                 {
-                    Tools = [.. _tools],
+                    Tools = [.. McpClientService.Tools], // Use tools from the service
                     ToolMode = ChatToolMode.RequireAny,
                     AllowMultipleToolCalls = true,
                     Temperature = (float?)0.8,
@@ -137,9 +131,9 @@
             // now add tools
             sb.AppendLine("Here are the functions/tools available in JSONSchema format, please call them using the role: \"tool\" and not \"assistant\" and always use json:");
 
-            if (_tools != null)
+            if (McpClientService.Tools != null) // Use tools from the service
             {
-                foreach (var tool in _tools)
+                foreach (var tool in McpClientService.Tools)
                 {
                     sb.AppendLine($"{tool.JsonSchema}");
                 }
