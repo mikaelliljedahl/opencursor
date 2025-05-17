@@ -150,7 +150,7 @@ AI: ```tool_code
 
 ## Supported Client Commands (JSON Function Calls from LLM):
 
-The Console Client (`OpenCursor.Client`) must parse and execute the following commands received as JSON objects within the LLM's response via the WebSocket connection:
+The MCPServer (`OpenCursor.MCPServer`) must parse and execute the following commands received as JSON objects within the LLM's response via the WebSocket connection:
 
 1.  **`codebase_search`**: Performs semantic search.
     *   `parameters`: `query` (string), `target_directories` (string[]?)
@@ -168,6 +168,8 @@ The Console Client (`OpenCursor.Client`) must parse and execute the following co
     *   `parameters`: `target_file` (string) (Mapped to `RelativePath` in C# class)
 
 (Note: Commands like `edit_file`, `reapply`, `parallel_apply` are instructions for the LLM agent itself and are not processed by the client.)
+
+Each tool must be implemented as a McpServerTool, see https://laurentkempe.com/2025/03/22/model-context-protocol-made-easy-building-an-mcp-server-in-csharp/
 
 ---
 

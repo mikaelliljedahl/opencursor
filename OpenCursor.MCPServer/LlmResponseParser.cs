@@ -151,11 +151,11 @@ namespace OpenCursor.Client
                         Console.WriteLine($"LLM Response Parser: Missing 'target_file' for delete_file command.");
                         command = null;
                     }
-                    else if (command is ReadFileCommand rfCmd && string.IsNullOrWhiteSpace(rfCmd.RelativePath))
-                    {
-                        Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for read_file command.");
-                        command = null;
-                    }
+                    //else if (command is ReadFileCommand rfCmd && string.IsNullOrWhiteSpace(rfCmd.RelativePath))
+                    //{
+                    //    Console.WriteLine($"LLM Response Parser: Missing 'relative_workspace_path' for read_file command.");
+                    //    command = null;
+                    //}
                     else if (command is CodebaseSearchCommand csCmd && string.IsNullOrWhiteSpace(csCmd.Query))
                     {
                         Console.WriteLine($"LLM Response Parser: Missing 'query' for codebase_search command.");

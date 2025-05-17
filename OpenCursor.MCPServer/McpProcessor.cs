@@ -111,7 +111,7 @@ namespace OpenCursor.Client
                 CreateFileCommand c => $"Create file '{c.RelativePath}'",
                 UpdateFileCommand u => $"Update file '{u.RelativePath}'",
                 DeleteFileCommand d => $"Delete file '{d.TargetFile}'",
-                ReadFileCommand r => $"Read file '{r.RelativePath}'" + (r.ShouldReadEntireFile ? " (entire)" : $" (lines {r.StartLine}-{r.EndLine})"),
+                //ReadFileCommand r => $"Read file '{r.RelativePath}'" + (r.ShouldReadEntireFile ? " (entire)" : $" (lines {r.StartLine}-{r.EndLine})"),
                 CodebaseSearchCommand cs => $"Search codebase: '{cs.Query}'" + (cs.TargetDirectories?.Any() == true ? $" in {string.Join(", ", cs.TargetDirectories)}" : ""),
                 RunTerminalCommand rt => $"Run command: '{rt.CommandLine}'" + (rt.IsBackground ? " (background)" : ""),
                 ListDirCommand ld => $"List directory '{ld.RelativePath}'",
