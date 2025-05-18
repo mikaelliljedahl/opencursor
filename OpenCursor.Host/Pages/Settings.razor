@@ -1,0 +1,41 @@
+@page "/settings"
+@inherits ComponentBase
+<PageTitle>Settings</PageTitle>
+
+<h1>Settings</h1>
+
+@if (_settings == null)
+{
+    <p>Loading settings...</p>
+}
+else
+{
+    <EditForm Model="_settings" OnValidSubmit="SaveSettings">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div>
+            <label>Google API Key:</label>
+            <InputText @bind-Value="_settings.GoogleApiKey" class="form-control" />
+        </div>
+        <div>
+            <label>OpenRouter API Key:</label>
+            <InputText @bind-Value="_settings.OpenRouterApiKey" class="form-control" />
+        </div>
+        <div>
+            <label>Chat Client:</label>
+            <InputSelect @bind-Value="_settings.ChatClient" class="form-control">
+                <option value="OpenRouter">OpenRouter</option>
+                <option value="Gemini">Gemini</option>
+            </InputSelect>
+        </div>
+        <div>
+            <label>Workspace Directory:</label>
+            <InputText @bind-Value="_settings.WorkspaceDirectory" class="form-control" />
+        </div>
+        <button type="submit" class="btn btn-primary mt-3">Save</button>
+    </EditForm>
+    @if (_saveMessage != null)
+    {
+        <div class="alert alert-success mt-2">@_saveMessage</div>
+    }
+}

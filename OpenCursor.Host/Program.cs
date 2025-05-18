@@ -30,17 +30,9 @@ builder.Services.AddServerSideBlazor();
 builder.Services.AddMcpServer()
     .WithToolsFromAssembly(typeof(ReadFileTool).Assembly);
 
-// Register chat client with function invocation support
-builder.Services.AddSingleton<WrappedGeminiChatClient>();
-builder.Services.AddSingleton<OpenRouterChatClient>();
-
-builder.Services.AddChatClient(factory =>
-{
-    var client = factory.GetRequiredService<OpenRouterChatClient>(); // Can easily be replaced with a different client
-    return client.AsBuilder()
-    .UseFunctionInvocation() // magic that makes the client call functions
-    .Build();
-});
+// Register settings and chat client selector services
+builder.Services.AddSingleton<SettingsService>();
+builder.Services.AddSingleton<ChatClientSelectorService>();
 
 // Register McpClientService as a singleton
 builder.Services.AddScoped<McpClientService>();
