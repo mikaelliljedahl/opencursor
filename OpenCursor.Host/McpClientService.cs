@@ -1,40 +1,26 @@
-using Microsoft.Extensions.AI;
-using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol.Transport;
-using ModelContextProtocol.Protocol.Types;
+using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Server;
+using OpenCursor.MCPServer;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace OpenCursor.Host
 {
-    public class McpClientService(IClientTransport clientTransport, IChatClient chatClient, ILogger<McpClientService> logger)
+    public class McpClientService
     {
-        private IMcpClient _mcpClient;
-        private IList<McpClientTool> _tools;
+        
+        private readonly IEnumerable<McpServerTool> _tools;
 
-        public IMcpClient McpClient => _mcpClient;
-        public IList<McpClientTool> Tools => _tools;
-
-        public async Task InitializeAsync()
+        public McpClientService(ILogger<McpClientService> logger, IEnumerable<McpServerTool> tools)
         {
-            if (_mcpClient == null)
-            {
-                try
-                {
-                    
-                    _mcpClient = await McpClientFactory.CreateAsync(clientTransport, clientOptions: new()
-                    {
-                        
-                        Capabilities = new ClientCapabilities() { Sampling = new() { SamplingHandler = chatClient.CreateSamplingHandler() } }
-                    });
-                    _tools = await _mcpClient.ListToolsAsync();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Could not initialize McpClient");
-                    _tools = new List<McpClientTool>();
-                }
-            }
+            
+            _tools = tools;
+        }
+
+        public IEnumerable<McpServerTool> GetAvailableTools()
+        {
+            return _tools;
         }
     }
 }

@@ -1,8 +1,8 @@
 @page "/"
 @inject McpClientService McpClientService // Inject the singleton service
-@inject Microsoft.Extensions.AI.IChatClient ChatClient // Inject the configured chat client
-@using ModelContextProtocol.Client
-@using ModelContextProtocol.Protocol.Types
+@inject Microsoft.Extensions.AI.IChatClient _chatClient // Inject the configured chat client
+@using OpenCursor.Client
+@using OpenCursor.Client.Handlers
 @using System.Text
 @using System.IO
 @using Microsoft.Extensions.AI
@@ -34,19 +34,22 @@
     // LLM related state
     private List<Microsoft.Extensions.AI.ChatMessage> messages = new List<Microsoft.Extensions.AI.ChatMessage>(); // chathistory for the LLM
 
+    // Store tool names in state
+    private List<string> _tools = new();
+
     protected override async Task OnInitializedAsync()
     {
-        // Initialize MCP Client via the service
-        await McpClientService.InitializeAsync();
+        // Get available tool names from the MCP service
+        if (McpClientService != null)
+        {
+            _tools = McpClientService.GetAvailableTools().Select(t=>t.ProtocolTool.Name).ToList();
+        }
 
         AddChatMessage($"Tools available:");
 
-        if (McpClientService.Tools != null)
+        foreach (var tool in _tools)
         {
-            foreach (var tool in McpClientService.Tools)
-            {
-                AddChatMessage($" {tool.Name}"); // Display tool name instead of full object
-            }
+            AddChatMessage($" {tool}"); // Display tool name
         }
 
         var systemPrompt = BuildSystemPrompt();
@@ -57,7 +60,6 @@
     public void AddChatMessage(string message)
     {
         _chatHistory.Add(message);
-        // Blazor automatically updates the UI when state changes, no Dispatcher.Invoke needed
         StateHasChanged();
     }
 
@@ -70,27 +72,17 @@
 
         string userInput = _userInput.Trim();
 
-        // Add user message to UI and internal history
         AddChatMessage($"User: {userInput}");
-        _userInput = string.Empty; // Clear input
-        _isSending = true; // Disable button during API call
-        StateHasChanged(); // Update UI to show message and disable button
+        _userInput = string.Empty;
+        _isSending = true;
+        StateHasChanged();
 
         try
         {
             messages.Add(new(ChatRole.User, userInput));
 
-            var response = await ChatClient.GetResponseAsync(messages,
-                new ChatOptions()
-                {
-                    Tools = [.. McpClientService.Tools], // Use tools from the service
-                    ToolMode = ChatToolMode.RequireAny,
-                    AllowMultipleToolCalls = true,
-                    Temperature = (float?)0.8,
-                    ResponseFormat = ChatResponseFormat.Json
-                });
-
-            AddChatMessage($"LLM: {response.Text}"); // Add LLM response to UI
+            // For now, just echo the tools (replace with actual tool invocation logic as needed)
+            AddChatMessage($"SYSTEM: MCP tools available: {string.Join(", ", _tools)}");
         }
         catch (Exception ex)
         {
@@ -98,8 +90,8 @@
         }
         finally
         {
-            _isSending = false; // Re-enable button
-            StateHasChanged(); // Update UI to re-enable button
+            _isSending = false;
+            StateHasChanged();
         }
     }
 
@@ -111,8 +103,7 @@
         }
     }
 
-
-    private string SystemPromptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SystemPrompt", "systemprompt.md"); // Assuming it's copied to output
+    private string SystemPromptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SystemPrompt", "systemprompt.md");
 
     private string BuildSystemPrompt()
     {
@@ -128,17 +119,12 @@
             var systemprompt = File.ReadAllText(SystemPromptFilePath).Trim();
             sb.Append(systemprompt);
 
-            // now add tools
             sb.AppendLine("Here are the functions/tools available in JSONSchema format, please call them using the role: \"tool\" and not \"assistant\" and always use json:");
 
-            if (McpClientService.Tools != null) // Use tools from the service
+            foreach (var tool in _tools)
             {
-                foreach (var tool in McpClientService.Tools)
-                {
-                    sb.AppendLine($"{tool.JsonSchema}");
-                }
+                sb.AppendLine($"{tool}");
             }
-
 
             return sb.ToString();
         }
@@ -147,7 +133,6 @@
             string errorMsg = $"SYSTEM: WARNING! Could not load system prompt from {SystemPromptFilePath}. Error: {ex.Message}";
             Console.WriteLine(errorMsg);
             AddChatMessage(errorMsg);
-            // Return a default minimal prompt
             return "You are a helpful assistant. Format commands using json tags.";
         }
     }

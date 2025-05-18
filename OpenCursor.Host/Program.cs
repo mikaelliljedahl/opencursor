@@ -1,8 +1,9 @@
 using Microsoft.Extensions.AI;
-using ModelContextProtocol.Protocol.Transport;
 using OpenCursor.Host;
 using OpenCursor.Host.LlmClient;
 using Serilog;
+using OpenCursor.MCPServer.Tools; // For ReadFileTool
+using ModelContextProtocol.Server; // For AddMcpServer
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,21 +22,13 @@ if (builder.Environment.IsDevelopment())
     builder.Logging.AddSerilog();
 }
 
-
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
-builder.Services.AddSingleton<IClientTransport>(factory =>
-{
-    // Connect to the MCP Server process
-    var clientTransport = new StdioClientTransport(new StdioClientTransportOptions()
-    {
-        Command = "OpenCursor.MCPServer.exe", // Must match server's executable name
-        Name = "OpenCursor.MCPServer"
-    });
-    return clientTransport;
-});
+// Register MCP server in-process and only the ReadFileTool
+builder.Services.AddMcpServer()
+    .WithToolsFromAssembly(typeof(ReadFileTool).Assembly);
 
 // Register chat client with function invocation support
 builder.Services.AddSingleton<WrappedGeminiChatClient>();
@@ -43,14 +36,11 @@ builder.Services.AddSingleton<OpenRouterChatClient>();
 
 builder.Services.AddChatClient(factory =>
 {
-    var client = factory.GetRequiredService<OpenRouterChatClient>(); // Can easilly be replaced with a different client
+    var client = factory.GetRequiredService<OpenRouterChatClient>(); // Can easily be replaced with a different client
     return client.AsBuilder()
     .UseFunctionInvocation() // magic that makes the client call functions
     .Build();
 });
-
-//// Register the hosted service to start the MCP server process
-//builder.Services.AddHostedService<McpServerHostedService>();
 
 // Register McpClientService as a singleton
 builder.Services.AddScoped<McpClientService>();
