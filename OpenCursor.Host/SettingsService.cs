@@ -8,8 +8,10 @@ namespace OpenCursor.Host
     {
         public string GoogleApiKey { get; set; } = string.Empty;
         public string OpenRouterApiKey { get; set; } = string.Empty;
-        public string ChatClient { get; set; } = "OpenRouter"; // or "Gemini"
+        public string ClaudeApiKey { get; set; } = string.Empty;
+        public string ChatClient { get; set; } = "OpenRouter"; // "OpenRouter", "Gemini", or "Claude"
         public string WorkspaceDirectory { get; set; } = string.Empty;
+        public string ClaudeModel { get; set; } = "claude-3-5-sonnet-20241022";
     }
 
     public class SettingsService

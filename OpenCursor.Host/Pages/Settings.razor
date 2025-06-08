@@ -22,10 +22,23 @@ else
             <InputText @bind-Value="_settings.OpenRouterApiKey" class="form-control" />
         </div>
         <div>
+            <label>Claude API Key:</label>
+            <InputText @bind-Value="_settings.ClaudeApiKey" class="form-control" />
+        </div>
+        <div>
             <label>Chat Client:</label>
             <InputSelect @bind-Value="_settings.ChatClient" class="form-control">
                 <option value="OpenRouter">OpenRouter</option>
                 <option value="Gemini">Gemini</option>
+                <option value="Claude">Claude</option>
+            </InputSelect>
+        </div>
+        <div>
+            <label>Claude Model:</label>
+            <InputSelect @bind-Value="_settings.ClaudeModel" class="form-control">
+                <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                <option value="claude-3-opus-20240229">Claude 3 Opus</option>
             </InputSelect>
         </div>
         <div>

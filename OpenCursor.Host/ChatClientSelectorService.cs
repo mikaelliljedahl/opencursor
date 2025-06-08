@@ -27,17 +27,26 @@ namespace OpenCursor.Host
                     disposable.Dispose();
 
                 _lastClientType = settings.ChatClient;
-                if (settings.ChatClient == "Gemini")
+                switch (settings.ChatClient)
                 {
-                    _currentClient = new WrappedGeminiChatClient(new ConfigurationBuilder()
-                        .AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("GoogleApiKey", settings.GoogleApiKey) })
-                        .Build());
-                }
-                else
-                {
-                    _currentClient = new OpenRouterChatClient(new ConfigurationBuilder()
-                        .AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("OpenRouterApiKey", settings.OpenRouterApiKey) })
-                        .Build());
+                    case "Gemini":
+                        _currentClient = new WrappedGeminiChatClient(new ConfigurationBuilder()
+                            .AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("GoogleApiKey", settings.GoogleApiKey) })
+                            .Build());
+                        break;
+                    case "Claude":
+                        _currentClient = new ClaudeChatClient(new ConfigurationBuilder()
+                            .AddInMemoryCollection(new[] { 
+                                new KeyValuePair<string, string?>("ClaudeApiKey", settings.ClaudeApiKey),
+                                new KeyValuePair<string, string?>("ClaudeModel", settings.ClaudeModel)
+                            })
+                            .Build());
+                        break;
+                    default: // OpenRouter
+                        _currentClient = new OpenRouterChatClient(new ConfigurationBuilder()
+                            .AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("OpenRouterApiKey", settings.OpenRouterApiKey) })
+                            .Build());
+                        break;
                 }
             }
             return _currentClient;
